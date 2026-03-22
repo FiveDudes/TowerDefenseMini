@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tower Defense Mini</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="title-screen" class="title-screen">
+        <div class="title-card">
+          <h1>Tower Defense Mini</h1>
+          <p>Choose your difficulty to begin.</p>
+          <div class="difficulty-buttons">
+            <button data-difficulty="easy">Easy</button>
+            <button data-difficulty="medium">Medium</button>
+            <button data-difficulty="hard">Hard</button>
+          </div>
+        </div>
+      </div>
+      <div id="game-over" class="title-screen hidden">
+        <div class="title-card">
+          <h1>Game Over</h1>
+          <p>Your defenses have fallen.</p>
+          <div class="difficulty-buttons">
+            <button id="restart-game">Restart</button>
+            <button id="main-menu">Main Menu</button>
+          </div>
+        </div>
+      </div>
+      <header class="topbar">
+        <div>
+          <h1>Tower Defense Mini</h1>
+          <p>Place towers on walls on grass. Enemies follow the path. Don’t let 20 through.</p>
+        </div>
+        <div class="hud">
+          <div>Lives: <span id="lives">20</span></div>
+          <div>Gold: <span id="gold">120</span></div>
+          <div>Wave: <span id="wave">0</span></div>
+        </div>
+      </header>
+      <main class="play">
+        <canvas id="game" width="960" height="540"></canvas>
+        <aside class="panel">
+          <h2>Build</h2>
+          <div class="panel-grid">
+            <div class="build-list">
+              <button id="build-watch" class="btn-watch">Watch Tower (40)</button>
+              <button id="build-freeze" class="btn-freeze">Freeze Tower (70)</button>
+              <button id="build-drone" class="btn-drone">Drone Tower (80)</button>
+              <button id="build-bomb" class="btn-bomb">Bomb Tower (85)</button>
+              <button id="build-laser" class="btn-laser">Laser Tower (100)</button>
+              <button id="build-dart" class="btn-dart">Dart Tower (75)</button>
+              <button id="build-mine" class="btn-mine">Landmine (30)</button>
+              <button id="build-wall" class="btn-wall">Wall (10)</button>
+              <button id="build-op" class="hidden op-button btn-op">Jasper Tower (0)</button>
+            </div>
+            <div class="upgrade-panel" id="upgrade-panel">
+              <strong>Upgrade</strong>
+              <div id="upgrade-details">Select a tower to see upgrade info.</div>
+              <div id="watch-upgrade-actions" class="upgrade-actions hidden">
+                <button id="watch-path-1" class="btn-watch">Path 1 Upgrade</button>
+                <button id="watch-path-2" class="btn-watch">Path 2 Upgrade</button>
+              </div>
+            </div>
+          </div>
+          <button id="start-wave">Start Wave</button>
+          <div class="tip">
+            <strong>Enemy Encyclopedia</strong>
+            <div id="encyclopedia">Encounter enemies to learn about them.</div>
+          </div>
+          <div id="jasper-controls" class="tip hidden">
+            <strong>Jasper Controls</strong>
+            <div class="control-row">
+              <label for="set-wave">Set Wave</label>
+              <input id="set-wave" type="number" min="1" value="1" />
+              <button id="apply-wave">Apply</button>
+            </div>
+            <div class="control-row">
+              <label for="wave-speed">Wave Speed</label>
+              <select id="wave-speed">
+                <option value="1">1x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+              </select>
+            </div>
+            <button id="auto-wave">Auto Next Wave: Off</button>
+          </div>
+          <div class="tip">
+            <strong>Tips</strong>
+            <p>Click a tower to upgrade (cost 50). Freeze towers reduce enemy speed.</p>
+            <p>Drone towers patrol around their build point. Laser towers pierce.</p>
+            <p>Press <kbd>Space</kbd> to start the next wave.</p>
+            <p>Right-click a tower to sell it for 80% back.</p>
+          </div>
+        </aside>
+      </main>
+      <footer class="footer">
+        Simple JS + Canvas. No external libraries.
+      </footer>
+    </div>
+    <script src="game.js"></script>
+  </body>
+</html>
