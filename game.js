@@ -123,10 +123,13 @@ const towerTypes = {
     rate: 1.3,
     damage: 0,
     color: "#7dd3fc",
-    slow: 0.45,
-    projectileType: "spread",
-    spreadCount: 3,
-    spreadAngle: 0.28,
+    slow: 0.55,
+    projectileType: "gas",
+    gasSpeed: 140,
+    gasDuration: 1.2,
+    gasRadius: 10,
+    gasMaxRadius: 44,
+    gasGrowRate: 38,
   },
   drone: {
     cost: 80,
@@ -141,11 +144,12 @@ const towerTypes = {
   bomb: {
     cost: 85,
     range: 120,
-    rate: 1.7,
+    rate: 1.5,
     damage: 16,
     color: "#fb7185",
     slow: 0,
     splashRadius: 48,
+    projectileSpeed: 300,
   },
   laser: {
     cost: 100,
@@ -156,16 +160,20 @@ const towerTypes = {
     slow: 0,
     laser: true,
     beamWidth: 8,
+    fireUnlockLevel: 3,
+    fireDps: 9,
+    fireDuration: 2.4,
   },
   dart: {
     cost: 75,
-    range: 130,
-    rate: 0.95,
-    damage: 4,
+    range: 140,
+    rate: 0.8,
+    damage: 6,
     color: "#a78bfa",
     slow: 0,
-    poisonDps: 5,
-    poisonDuration: 3,
+    poisonDps: 10,
+    poisonDuration: 4,
+    projectileSpeed: 380,
   },
   mine: {
     cost: 30,
@@ -409,6 +417,11 @@ function updateEncyclopedia() {
       desc: "Only laser or bomb damage hurts.",
     },
     {
+      key: "darkmatter",
+      name: "Dark Matter Frog",
+      desc: "Immune to laser, poison, and slow effects.",
+    },
+    {
       key: "heavy",
       name: "Heavy Frog",
       desc: "Very tanky but slow.",
@@ -430,7 +443,7 @@ function updateEncyclopedia() {
     lines.push(`<div><strong>${entry.name}</strong><div>${entry.desc}</div></div>`);
   }
   if (state.infiniteGold) {
-    lines.push("<div><strong>Tower Stats</strong><div>Watch: 40c, 100r, 0.95s, 9 dmg</div><div>Freeze: 70c, 120r, 1.3s, 0 dmg, 0.45 slow</div><div>Drone: 80c, 120r, 0.75s, 7 dmg</div><div>Bomb: 85c, 120r, 1.7s, 16 dmg, 48 splash</div><div>Laser: 100c, 160r, 1.6s, 12 dmg, pierce</div><div>Dart: 75c, 130r, 0.95s, 4 dmg, 5 DPS poison</div><div>Mine: 30c, 28 dmg, 46 splash</div><div>Wall: 10c</div></div>");
+    lines.push("<div><strong>Tower Stats</strong><div>Watch: 40c, 100r, 0.95s, 9 dmg</div><div>Freeze: 70c, 120r, 1.3s, gas slow</div><div>Drone: 80c, 120r, 0.75s, 7 dmg</div><div>Bomb: 85c, 120r, 1.5s, 16 dmg, 48 splash</div><div>Laser: 100c, 160r, 1.6s, 12 dmg, pierce, burn upgrade</div><div>Dart: 75c, 140r, 0.8s, 6 dmg, 10 DPS poison</div><div>Mine: 30c, 28 dmg, 46 splash</div><div>Wall: 10c</div></div>");
     lines.push("<div><strong>Enemy Stats</strong><div>Grunt: base HP 20 + 5*wave, base speed 26 + 2.6*wave</div><div>Speedy: faster version of grunt</div><div>Heavy: 2.4x HP, 0.6x speed</div><div>Boss: 6x HP</div><div>Tiers: +35% HP and +6% speed per tier</div></div>");
   }
   ui.encyclopedia.innerHTML = lines.length > 0 ? lines.join("") : "<div>Encounter enemies to learn about them.</div>";
@@ -479,11 +492,25 @@ function spawnEnemy() {
     : (state.wave === 1 ? 26 : 28 + state.wave * 2.6);
   const speed = (type === "heavy" ? baseSpeed * 0.6 : baseSpeed) * tierSpeed * (type === "stealth" ? 0.9 : 1);
   const speedMultiplier = state.difficultyMultipliers.enemySpeed || 1;
-  const armoredChance = state.wave < 4 ? 0 : (isBossWave ? 0.45 : Math.min(0.22 + state.wave * 0.01, 0.55));
-  const armored = type !== "boss" && type !== "stealth" && Math.random() < armoredChance;
+  let armored = false;
+  let darkMatter = false;
+  if (type !== "boss" && type !== "stealth") {
+    const roll = Math.random();
+    if (roll < 0.01) {
+      armored = true;
+      darkMatter = true;
+    } else if (roll < 0.11) {
+      armored = true;
+    } else if (roll < 0.21) {
+      darkMatter = true;
+    }
+  }
   state.encyclopedia.add(type);
   if (armored) {
     state.encyclopedia.add("armored");
+  }
+  if (darkMatter) {
+    state.encyclopedia.add("darkmatter");
   }
   if (type === "stealth") {
     state.encyclopedia.add("stealth");
@@ -502,8 +529,11 @@ function spawnEnemy() {
     slowTimer: 0,
     type,
     armored,
+    darkMatter,
     dotTimer: 0,
     dotDps: 0,
+    burnTimer: 0,
+    burnDps: 0,
     tier,
     facing: 0,
     stealth: type === "stealth",
@@ -527,7 +557,9 @@ function placeTower(type, x, y) {
     if (!hasWall) return;
   }
   for (const tower of state.towers) {
-    const overlap = Math.hypot(tower.x - x, tower.y - y) < 30;
+    const towerX = tower.type === "drone" && Number.isFinite(tower.baseX) ? tower.baseX : tower.x;
+    const towerY = tower.type === "drone" && Number.isFinite(tower.baseY) ? tower.baseY : tower.y;
+    const overlap = Math.hypot(towerX - x, towerY - y) < 30;
     if (!overlap) continue;
     if (tower.type === "wall" && type !== "wall") continue;
     return;
@@ -592,6 +624,8 @@ function getTowerStats(tower) {
   let damage = data.damage;
   let rate = data.rate;
   let slow = data.slow;
+  let fireDps = 0;
+  let fireDuration = 0;
 
   if (tower.type === "watch") {
     const path = tower.upgradePath || 1;
@@ -620,6 +654,14 @@ function getTowerStats(tower) {
     damage = data.damage + (level - 1) * 4;
     rate = Math.max(0.2, data.rate * Math.pow(0.92, level - 1));
     slow = data.slow + (tower.type === "freeze" ? (level - 1) * 0.07 : 0);
+    if (tower.type === "laser") {
+      const unlock = data.fireUnlockLevel || 3;
+      if (level >= unlock) {
+        const bonus = level - unlock;
+        fireDps = (data.fireDps || 0) + bonus * 1.2;
+        fireDuration = (data.fireDuration || 0) + bonus * 0.25;
+      }
+    }
   }
 
   return {
@@ -628,6 +670,8 @@ function getTowerStats(tower) {
     damage,
     rate,
     slow: Math.min(0.85, slow),
+    fireDps,
+    fireDuration,
   };
 }
 
@@ -636,13 +680,13 @@ function getTowerDescription(type) {
     case "watch":
       return "Fast single-shot line bullets. Detects stealth.";
     case "freeze":
-      return "Spread shots that slow enemies.";
+      return "Gas clouds that spread out and slow enemies.";
     case "drone":
       return "Mobile tower that chases targets.";
     case "bomb":
       return "Explosive shots with splash damage.";
     case "laser":
-      return "Piercing beam that hits lines of enemies.";
+      return "Piercing beam that hits lines of enemies. Upgrades add burn.";
     case "dart":
       return "Poisons enemies over time.";
     case "mine":
@@ -677,6 +721,9 @@ function updateUpgradePanel() {
   if (tower.type === "freeze") {
     upgradeText = "Upgrades: stronger slow + longer range.";
   }
+  if (tower.type === "laser") {
+    upgradeText = "Upgrades: +damage, +range, faster fire. Tier 3+ adds burn.";
+  }
   if (tower.type === "watch") {
     const tier = Math.min(tower.level, 5);
     const path = tower.upgradePath || 1;
@@ -699,7 +746,8 @@ function updateUpgradePanel() {
       ][tier - 1] || `Pick a path. Next cost ${cost}.`;
     }
   }
-  ui.upgradeDetails.textContent = `Next: Tier ${nextTier} (Cost ${upgradeCost}). ${desc} ${upgradeText} Range ${Math.round(stats.range)} | Rate ${stats.rate.toFixed(2)}s | Damage ${Math.round(stats.damage)}${tower.type === "freeze" ? ` | Slow ${stats.slow.toFixed(2)}` : ""}`;
+  const burnText = stats.fireDps > 0 ? ` | Burn ${stats.fireDps.toFixed(1)}/s (${stats.fireDuration.toFixed(1)}s)` : "";
+  ui.upgradeDetails.textContent = `Next: Tier ${nextTier} (Cost ${upgradeCost}). ${desc} ${upgradeText} Range ${Math.round(stats.range)} | Rate ${stats.rate.toFixed(2)}s | Damage ${Math.round(stats.damage)}${tower.type === "freeze" ? ` | Slow ${stats.slow.toFixed(2)}` : ""}${burnText}`;
   if (ui.watchUpgradeActions) {
     ui.watchUpgradeActions.classList.toggle("hidden", tower.type !== "watch");
   }
@@ -730,35 +778,52 @@ function handleClick(event) {
   }
 }
 
+function emitFreezeGas(tower, enemy, stats) {
+  const { data } = stats;
+  const origin = { x: tower.x, y: tower.y };
+  const targetPos = getEnemyPosition(enemy);
+  const angle = Math.atan2(targetPos.y - origin.y, targetPos.x - origin.x);
+  const speed = data.gasSpeed || 140;
+  tower.facing = angle;
+
+  let proj = state.projectiles.find((entry) => entry.kind === "gas" && entry.owner === tower);
+  if (!proj) {
+    proj = {
+      kind: "gas",
+      owner: tower,
+      x: origin.x,
+      y: origin.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      ttl: data.gasDuration || 1.1,
+      radius: data.gasRadius || 10,
+      maxRadius: data.gasMaxRadius || 40,
+      growRate: data.gasGrowRate || 35,
+      slow: stats.slow,
+      sourceType: tower.type,
+    };
+    state.projectiles.push(proj);
+  } else {
+    proj.vx = Math.cos(angle) * speed;
+    proj.vy = Math.sin(angle) * speed;
+    proj.slow = stats.slow;
+    proj.growRate = data.gasGrowRate || proj.growRate;
+    proj.maxRadius = data.gasMaxRadius || proj.maxRadius;
+  }
+
+  proj.ttl = data.gasDuration || 1.1;
+  proj.x = origin.x + Math.cos(angle) * 8;
+  proj.y = origin.y + Math.sin(angle) * 8;
+}
+
 function fireProjectile(tower, enemy, stats) {
   const { data } = stats;
   const damage = stats.damage;
   const sourceType = tower.type;
-  const poisonDps = (data.poisonDps || 0) + (tower.level - 1) * 1;
+  const poisonDps = (data.poisonDps || 0) + (tower.level - 1) * 1.5;
   const poisonDuration = data.poisonDuration ? data.poisonDuration + (tower.level - 1) * 0.2 : 0;
-  if (data.projectileType === "spread") {
-    const origin = { x: tower.x, y: tower.y };
-    const targetPos = getEnemyPosition(enemy);
-    const baseAngle = Math.atan2(targetPos.y - origin.y, targetPos.x - origin.x);
-    const count = data.spreadCount || 3;
-    const step = data.spreadAngle || 0.25;
-    const startOffset = -step * Math.floor(count / 2);
-    for (let i = 0; i < count; i += 1) {
-      const angle = baseAngle + startOffset + i * step;
-      const speed = 360;
-      state.projectiles.push({
-        kind: "spread",
-        x: origin.x,
-        y: origin.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        ttl: 0.9,
-        damage: 0,
-        slow: stats.slow,
-        hitRadius: 10,
-        sourceType,
-      });
-    }
+  if (data.projectileType === "gas") {
+    emitFreezeGas(tower, enemy, stats);
     return;
   }
 
@@ -768,7 +833,7 @@ function fireProjectile(tower, enemy, stats) {
       x: tower.x,
       y: tower.y,
       target: enemy,
-      speed: 260,
+      speed: data.projectileSpeed || 260,
       damage,
       splashRadius: data.splashRadius,
       sourceType,
@@ -781,7 +846,7 @@ function fireProjectile(tower, enemy, stats) {
     x: tower.x,
     y: tower.y,
     target: enemy,
-    speed: 320,
+    speed: data.projectileSpeed || 320,
     damage,
     slow: stats.slow,
     sourceType,
@@ -809,6 +874,7 @@ function fireLaser(tower, enemy, stats, range) {
   const sourceType = tower.type;
   for (const target of state.enemies) {
     if (target.hp <= 0) continue;
+    if (target.darkMatter && (sourceType === "laser" || sourceType === "op")) continue;
     if (target.armored && sourceType !== "laser" && sourceType !== "bomb" && sourceType !== "op") continue;
     const pos = getEnemyPosition(target);
     const vx = pos.x - originX;
@@ -820,6 +886,10 @@ function fireLaser(tower, enemy, stats, range) {
     const distToLine = Math.hypot(pos.x - closestX, pos.y - closestY);
     if (distToLine <= beamWidth) {
       target.hp -= damage;
+      if (stats.fireDps > 0 && stats.fireDuration > 0 && !target.darkMatter) {
+        target.burnTimer = Math.max(target.burnTimer, stats.fireDuration);
+        target.burnDps = Math.max(target.burnDps, stats.fireDps);
+      }
       if (sourceType === "op" && data.splashRadius) {
         for (const splash of state.enemies) {
           if (splash.hp <= 0) continue;
@@ -858,18 +928,18 @@ function fireLaser(tower, enemy, stats, range) {
 
 function updateProjectiles(dt) {
   state.projectiles = state.projectiles.filter((proj) => {
-    if (proj.kind === "spread") {
+    if (proj.kind === "gas") {
       proj.ttl -= dt;
       proj.x += proj.vx * dt;
       proj.y += proj.vy * dt;
+      proj.radius = Math.min(proj.maxRadius || proj.radius, proj.radius + (proj.growRate || 0) * dt);
       for (const enemy of state.enemies) {
         if (enemy.hp <= 0) continue;
-        if (enemy.armored) continue;
+        if (enemy.darkMatter) continue;
         const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
-        if (dist <= proj.hitRadius) {
-          enemy.slowTimer = Math.max(enemy.slowTimer, 1.6);
-          enemy.slowFactor = proj.slow;
-          return false;
+        if (dist <= proj.radius) {
+          enemy.slowTimer = Math.max(enemy.slowTimer, 1);
+          enemy.slowFactor = Math.max(enemy.slowFactor || 0, proj.slow);
         }
       }
       return proj.ttl > 0;
@@ -919,12 +989,12 @@ function updateProjectiles(dt) {
     if (dist <= step) {
       if (!(proj.target.armored && proj.sourceType !== "laser" && proj.sourceType !== "bomb" && proj.sourceType !== "op")) {
         proj.target.hp -= proj.damage;
-        if (proj.poisonDuration > 0 && proj.poisonDps > 0) {
+        if (!proj.target.darkMatter && proj.poisonDuration > 0 && proj.poisonDps > 0) {
           proj.target.dotTimer = Math.max(proj.target.dotTimer, proj.poisonDuration);
           proj.target.dotDps = Math.max(proj.target.dotDps, proj.poisonDps);
         }
       }
-      if (proj.slow > 0) {
+      if (proj.slow > 0 && !proj.target.darkMatter) {
         proj.target.slowTimer = Math.max(proj.target.slowTimer, 1.5);
         proj.target.slowFactor = proj.slow;
       }
@@ -950,12 +1020,14 @@ function updateTowerMovement(dt) {
   for (const tower of state.towers) {
     const data = towerTypes[tower.type];
     if (!data || !data.moveSpeed) continue;
+    const level = tower.level || 1;
+    const speedMultiplier = 1 + (level - 1) * 0.12;
     if (state.controlledDrone === tower) {
       const dx = state.mouse.x - tower.x;
       const dy = state.mouse.y - tower.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.5) {
-        const step = data.moveSpeed * 85 * dt;
+        const step = data.moveSpeed * speedMultiplier * 85 * dt;
         tower.x += (dx / dist) * Math.min(step, dist);
         tower.y += (dy / dist) * Math.min(step, dist);
       }
@@ -966,7 +1038,7 @@ function updateTowerMovement(dt) {
       const dy = tower.baseY - tower.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.5) {
-        const step = data.moveSpeed * 70 * dt;
+        const step = data.moveSpeed * speedMultiplier * 70 * dt;
         tower.x += (dx / dist) * Math.min(step, dist);
         tower.y += (dy / dist) * Math.min(step, dist);
       } else {
@@ -981,7 +1053,7 @@ function updateTowerMovement(dt) {
       const dy = tower.baseY - tower.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.5) {
-        const step = data.moveSpeed * 70 * dt;
+        const step = data.moveSpeed * speedMultiplier * 70 * dt;
         tower.x += (dx / dist) * Math.min(step, dist);
         tower.y += (dy / dist) * Math.min(step, dist);
       } else {
@@ -1005,7 +1077,7 @@ function updateTowerMovement(dt) {
       const dx = target.x - tower.x;
       const dy = target.y - tower.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const step = data.moveSpeed * 65 * dt;
+      const step = data.moveSpeed * speedMultiplier * 65 * dt;
       tower.x += (dx / dist) * Math.min(step, dist);
       tower.y += (dy / dist) * Math.min(step, dist);
     } else {
@@ -1013,7 +1085,7 @@ function updateTowerMovement(dt) {
       const dy = tower.baseY - tower.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.5) {
-        const step = data.moveSpeed * 55 * dt;
+        const step = data.moveSpeed * speedMultiplier * 55 * dt;
         tower.x += (dx / dist) * Math.min(step, dist);
         tower.y += (dy / dist) * Math.min(step, dist);
       }
@@ -1051,7 +1123,7 @@ function updateTowers(dt) {
     if (data.isMine || data.blocksPath) continue;
     tower.cooldown = Math.max(0, tower.cooldown - dt);
     const range = stats.range;
-    if (tower.cooldown > 0) continue;
+    if (tower.cooldown > 0 && tower.type !== "freeze") continue;
     let nearest = null;
     let nearestDist = Infinity;
     for (const enemy of state.enemies) {
@@ -1065,12 +1137,19 @@ function updateTowers(dt) {
       }
     }
     if (nearest) {
-      if (data.laser) {
+      if (tower.type === "freeze") {
+        emitFreezeGas(tower, nearest, stats);
+      } else if (data.laser) {
         fireLaser(tower, nearest, stats, range);
       } else {
         fireProjectile(tower, nearest, stats);
       }
       tower.cooldown = stats.rate;
+    } else if (tower.type === "freeze") {
+      const lingering = state.projectiles.find((entry) => entry.kind === "gas" && entry.owner === tower);
+      if (lingering) {
+        lingering.ttl = Math.min(lingering.ttl, 0.25);
+      }
     }
   }
 }
@@ -1085,6 +1164,15 @@ function updateEnemies(dt) {
       const tick = Math.min(enemy.dotTimer, dt);
       enemy.dotTimer -= dt;
       enemy.hp -= enemy.dotDps * tick;
+      if (enemy.hp <= 0) {
+        awardGold(15);
+        continue;
+      }
+    }
+    if (enemy.burnTimer > 0) {
+      const tick = Math.min(enemy.burnTimer, dt);
+      enemy.burnTimer -= dt;
+      enemy.hp -= enemy.burnDps * tick;
       if (enemy.hp <= 0) {
         awardGold(15);
         continue;
@@ -1375,6 +1463,10 @@ function drawTowers() {
 }
 
 function drawEnemies() {
+  function randomBetween(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
   function drawTriangle(x, y, size, angle, color) {
     ctx.save();
     ctx.translate(x, y);
@@ -1433,13 +1525,20 @@ function drawEnemies() {
     const tierScale = 1 + (enemy.tier - 1) * 0.18;
     const baseRadius = enemy.type === "boss" ? 20 : enemy.type === "heavy" ? 16 : 12;
     const radius = baseRadius * tierScale;
-    const baseColor = enemy.type === "boss"
+    let baseColor = enemy.type === "boss"
       ? "#f43f5e"
       : enemy.type === "speedy"
         ? "#facc15"
         : enemy.type === "heavy"
           ? "#a855f7"
           : "#fb923c";
+    if (enemy.darkMatter) {
+      baseColor = "#2b1f3a";
+    } else if (enemy.dotTimer > 0) {
+      baseColor = "#a855f7";
+    } else if (enemy.burnTimer > 0) {
+      baseColor = "#f97316";
+    }
 
     if (enemy.type === "speedy") {
       drawTriangle(pos.x, pos.y, radius, enemy.facing, baseColor);
@@ -1463,6 +1562,63 @@ function drawEnemies() {
       ctx.arc(pos.x, pos.y, radius + 2, 0, Math.PI * 2);
       ctx.stroke();
     }
+    if (enemy.darkMatter) {
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(99, 45, 151, 0.85)";
+      ctx.lineWidth = 2;
+      const bolts = 3;
+      for (let i = 0; i < bolts; i += 1) {
+        const startAngle = Math.random() * Math.PI * 2;
+        const segments = 5;
+        ctx.beginPath();
+        for (let s = 0; s <= segments; s += 1) {
+          const angle = startAngle + s * 0.4 + randomBetween(-0.2, 0.2);
+          const r = radius + 5 + randomBetween(-2, 4);
+          const x = pos.x + Math.cos(angle) * r;
+          const y = pos.y + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    if (enemy.burnTimer > 0) {
+      const sparks = 3;
+      for (let i = 0; i < sparks; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = randomBetween(2, radius + 2);
+        const x = pos.x + Math.cos(angle) * r;
+        const y = pos.y + Math.sin(angle) * r;
+        ctx.fillStyle = "rgba(251, 146, 60, 0.8)";
+        ctx.beginPath();
+        ctx.arc(x, y, randomBetween(1, 2.4), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (enemy.dotTimer > 0) {
+      const skulls = 2;
+      for (let i = 0; i < skulls; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = randomBetween(2, radius + 2);
+        const x = pos.x + Math.cos(angle) * r;
+        const y = pos.y + Math.sin(angle) * r;
+        ctx.fillStyle = "rgba(168, 85, 247, 0.85)";
+        ctx.beginPath();
+        ctx.arc(x, y, randomBetween(1.3, 2.6), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
+        ctx.beginPath();
+        ctx.arc(x - 0.8, y - 0.4, 0.5, 0, Math.PI * 2);
+        ctx.arc(x + 0.8, y - 0.4, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
     ctx.fillStyle = "#0f172a";
@@ -1477,17 +1633,20 @@ function drawEnemies() {
 
 function drawProjectiles() {
   for (const proj of state.projectiles) {
+    if (proj.kind === "gas") {
+      ctx.fillStyle = "rgba(125, 211, 252, 0.28)";
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      continue;
+    }
     if (proj.kind === "bomb") {
       ctx.fillStyle = "#fb7185";
       ctx.beginPath();
       ctx.arc(proj.x, proj.y, 6, 0, Math.PI * 2);
-      ctx.fill();
-      continue;
-    }
-    if (proj.kind === "spread") {
-      ctx.fillStyle = "#7dd3fc";
-      ctx.beginPath();
-      ctx.arc(proj.x, proj.y, 3, 0, Math.PI * 2);
       ctx.fill();
       continue;
     }
