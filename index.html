@@ -51,7 +51,13 @@
         </div>
       </header>
       <main class="play" id="play-area">
-        <canvas id="game" width="960" height="540"></canvas>
+        <div class="game-column">
+          <canvas id="game" width="960" height="540"></canvas>
+          <div class="game-actions">
+            <button id="nuke-button" class="btn-nuke">NUKE</button>
+            <div class="nuke-cost">Cost: 400</div>
+          </div>
+        </div>
         <aside class="panel">
           <h2>Build</h2>
           <div class="panel-grid">

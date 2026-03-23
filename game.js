@@ -27,6 +27,7 @@ const ui = {
   buildMine: document.getElementById("build-mine"),
   buildWall: document.getElementById("build-wall"),
   buildOp: document.getElementById("build-op"),
+  nukeButton: document.getElementById("nuke-button"),
   startWave: document.getElementById("start-wave"),
   pauseWave: document.getElementById("pause-wave"),
   upgradeDetails: document.getElementById("upgrade-details"),
@@ -85,6 +86,7 @@ const state = {
   lastLives: 20,
   damageFlashCooldown: 0,
   damageFlashActive: false,
+  nukeUsed: false,
   spawnTimer: 0,
   enemiesToSpawn: 0,
   easterUnlocked: false,
@@ -403,6 +405,10 @@ function updateHud() {
   ui.wave.textContent = state.wave;
   if (ui.buildWall) {
     ui.buildWall.textContent = state.wallsPlaced === 0 ? "Wall (Free)" : "Wall (10)";
+  }
+  if (ui.nukeButton) {
+    ui.nukeButton.textContent = state.nukeUsed ? "NUKE USED" : "NUKE";
+    ui.nukeButton.disabled = state.nukeUsed;
   }
 }
 
@@ -845,13 +851,14 @@ function getTowerStats(tower) {
     }
   }
 
+  const nukePenalty = tower.nukePenalty || 1;
   return {
     data,
-    range,
-    damage,
-    rate,
+    range: range * nukePenalty,
+    damage: damage * nukePenalty,
+    rate: rate / nukePenalty,
     slow: Math.min(0.85, slow),
-    fireDps,
+    fireDps: fireDps * nukePenalty,
     fireDuration,
   };
 }
@@ -2237,6 +2244,7 @@ function update(dt) {
     updateUpgradePanel();
     return;
   }
+  const simDt = dt * (state.waveSpeed || 1);
   state.damageFlashCooldown = Math.max(0, state.damageFlashCooldown - dt);
   if (state.lives < state.lastLives && state.damageFlashCooldown <= 0 && !state.damageFlashActive) {
     state.damageFlashActive = true;
@@ -2258,12 +2266,12 @@ function update(dt) {
     startWave();
   }
   updateSpawner(dt);
-  updateEnemies(dt);
+  updateEnemies(simDt);
   updateMines();
-  updateTowers(dt);
-  updateProjectiles(dt);
-  updateExplosions(dt);
-  updateBeams(dt);
+  updateTowers(simDt);
+  updateProjectiles(simDt);
+  updateExplosions(simDt);
+  updateBeams(simDt);
   updateHud();
   updateUpgradePanel();
   if (state.lives <= 0) {
@@ -2395,6 +2403,34 @@ if (ui.pauseWave) {
     if (ui.playArea) {
       ui.playArea.classList.toggle("paused-glitch", state.paused);
     }
+  });
+}
+
+if (ui.nukeButton) {
+  ui.nukeButton.addEventListener("click", () => {
+    if (state.nukeUsed) return;
+    const nukeCost = 400;
+    if (!canAfford(nukeCost)) {
+      flashButton(ui.nukeButton);
+      return;
+    }
+    payCost(nukeCost);
+    state.enemies = [];
+    state.projectiles = [];
+    state.beams = [];
+    state.explosions.push({
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      radius: Math.max(canvas.width, canvas.height),
+      ttl: 0.5,
+      color: "rgba(248, 113, 113, 0.55)",
+    });
+    for (const tower of state.towers) {
+      if (tower.type === "wall" || tower.type === "mine") continue;
+      tower.nukePenalty = (tower.nukePenalty || 1) * 0.5;
+    }
+    state.nukeUsed = true;
+    updateHud();
   });
 }
 
@@ -2628,6 +2664,7 @@ function resetGame() {
   state.lastLives = state.lives;
   state.damageFlashCooldown = 0;
   state.damageFlashActive = false;
+  state.nukeUsed = false;
   state.spawnTimer = 0;
   state.enemiesToSpawn = 0;
   state.easterUnlocked = false;
