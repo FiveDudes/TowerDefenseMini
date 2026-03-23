@@ -578,11 +578,13 @@ function spawnEnemy() {
   let armored = false;
   let darkMatter = false;
   if (type !== "boss" && type !== "stealth") {
+    const wallCost = state.wallsPlaced === 0 ? 0 : towerTypes.wall.cost;
+    const canAffordArmor = state.gold >= Math.min(towerTypes.laser.cost + wallCost, towerTypes.bomb.cost + wallCost);
     const roll = Math.random();
     if (roll < 0.01) {
       armored = true;
       darkMatter = true;
-    } else if (roll < 0.11) {
+    } else if (roll < 0.11 && canAffordArmor) {
       armored = true;
     } else if (roll < 0.21) {
       darkMatter = true;
