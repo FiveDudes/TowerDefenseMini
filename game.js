@@ -1917,6 +1917,7 @@ function emitFreezeGas(tower, enemy, stats) {
       y: origin.y,
       facing: angle,
       ttl: stats.freezeDuration || data.gasDuration || 1.1,
+      maxTtl: stats.freezeDuration || data.gasDuration || 1.1,
       radius: startRadius,
       maxRadius,
       growRate: stats.freezeGrowRate || data.gasGrowRate || 0,
@@ -1945,6 +1946,7 @@ function emitFreezeGas(tower, enemy, stats) {
   }
 
   proj.ttl = stats.freezeDuration || data.gasDuration || 1.1;
+  proj.maxTtl = proj.ttl;
   proj.x = origin.x;
   proj.y = origin.y;
 }
@@ -2939,7 +2941,8 @@ function updateTowers(dt) {
     } else if (tower.type === "freeze") {
       const lingering = state.projectiles.find((entry) => entry.kind === "gas" && entry.owner === tower);
       if (lingering) {
-        lingering.ttl = Math.min(lingering.ttl, 0.25);
+        lingering.ttl = Math.min(lingering.ttl, 1.2);
+        lingering.maxTtl = Math.max(lingering.maxTtl || 0, lingering.ttl);
       }
     }
   }
@@ -4152,14 +4155,16 @@ function drawEnemies() {
 function drawProjectiles() {
   for (const proj of state.projectiles) {
     if (proj.kind === "gas") {
+      const life = proj.maxTtl ? Math.max(0, Math.min(1, proj.ttl / proj.maxTtl)) : 1;
+      const alphaScale = 0.25 + life * 0.75;
       const gradient = ctx.createRadialGradient(proj.x, proj.y, proj.radius * 0.2, proj.x, proj.y, proj.radius);
-      gradient.addColorStop(0, "rgba(186, 230, 253, 0.38)");
-      gradient.addColorStop(1, "rgba(125, 211, 252, 0.12)");
+      gradient.addColorStop(0, `rgba(186, 230, 253, ${0.38 * alphaScale})`);
+      gradient.addColorStop(1, `rgba(125, 211, 252, ${0.12 * alphaScale})`);
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * alphaScale})`;
       ctx.lineWidth = 2;
       ctx.stroke();
       continue;
