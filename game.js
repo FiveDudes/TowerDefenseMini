@@ -142,7 +142,7 @@ const targetingLabels = {
 const state = {
   lives: 100,
   maxLives: 100,
-  gold: 80,
+  gold: 200,
   wave: 0,
   totalDamage: 0,
   placing: null,
@@ -261,7 +261,7 @@ function getWallPathSides(x, y) {
 
 const towerTypes = {
   watch: {
-    cost: 40,
+    cost: 45,
     range: 100,
     rate: 0.48,
     damage: 9,
@@ -269,7 +269,7 @@ const towerTypes = {
     slow: 0,
   },
   freeze: {
-    cost: 70,
+    cost: 80,
     range: 120,
     rate: 1.3,
     damage: 0,
@@ -283,7 +283,7 @@ const towerTypes = {
     gasGrowRate: 55,
   },
   drone: {
-    cost: 80,
+    cost: 95,
     range: 120,
     rate: 0.75,
     damage: 10,
@@ -293,7 +293,7 @@ const towerTypes = {
     moveRadius: 22,
   },
   bomb: {
-    cost: 85,
+    cost: 100,
     range: 120,
     rate: 1.5,
     damage: 18,
@@ -303,10 +303,10 @@ const towerTypes = {
     projectileSpeed: 300,
   },
   laser: {
-    cost: 100,
-    range: 160,
-    rate: 1.6,
-    damage: 12,
+    cost: 160,
+    range: 190,
+    rate: 1.35,
+    damage: 18,
     color: "#ef4444",
     slow: 0,
     laser: true,
@@ -316,7 +316,7 @@ const towerTypes = {
     fireDuration: 2.4,
   },
   dart: {
-    cost: 75,
+    cost: 85,
     range: 140,
     rate: 0.8,
     damage: 6,
@@ -327,7 +327,7 @@ const towerTypes = {
     projectileSpeed: 380,
   },
   flame: {
-    cost: 90,
+    cost: 105,
     range: 70,
     rate: 0.22,
     damage: 28,
@@ -338,7 +338,7 @@ const towerTypes = {
     burnDuration: 2.4,
   },
   trap: {
-    cost: 95,
+    cost: 110,
     range: 0,
     rate: 0,
     damage: 0,
@@ -346,7 +346,7 @@ const towerTypes = {
     slow: 0,
   },
   spikeTower: {
-    cost: 70,
+    cost: 85,
     range: 0,
     rate: 0,
     damage: 20,
@@ -359,7 +359,7 @@ const towerTypes = {
     allowOnPath: false,
   },
   mine: {
-    cost: 15,
+    cost: 20,
     range: 0,
     rate: 0,
     damage: 14,
@@ -372,7 +372,7 @@ const towerTypes = {
     noGridlock: true,
   },
   floorSpike: {
-    cost: 50,
+    cost: 60,
     range: 0,
     rate: 0,
     damage: 6,
@@ -387,7 +387,7 @@ const towerTypes = {
     spikeHold: 0.2,
   },
   wall: {
-    cost: 10,
+    cost: 15,
     range: 0,
     rate: 0,
     damage: 0,
@@ -742,7 +742,7 @@ function updateEncyclopedia() {
     }
   }
   if (state.infiniteGold) {
-    lines.push("<div><strong>Tower Stats</strong><div>Watch: 40c, 100r, 0.95s, 9 dmg</div><div>Freeze: 70c, 120r, 1.3s, gas slow</div><div>Drone: 80c, 120r, 0.75s, 10 dmg</div><div>Bomb: 85c, 120r, 1.5s, 18 dmg, 48 splash</div><div>Laser: 100c, 160r, 1.6s, 12 dmg, pierce, burn upgrade</div><div>Dart: 75c, 140r, 0.8s, 6 dmg, 10 DPS poison</div><div>Mine: 30c, 28 dmg, 46 splash</div><div>Wall: 10c</div></div>");
+    lines.push("<div><strong>Tower Stats</strong><div>Watch: 45c, 100r, 0.95s, 9 dmg</div><div>Freeze: 80c, 120r, 1.3s, gas slow</div><div>Drone: 95c, 120r, 0.75s, 10 dmg</div><div>Bomb: 100c, 120r, 1.5s, 18 dmg, 36 splash</div><div>Laser: 160c, 190r, 1.35s, 18 dmg, pierce, burn upgrade</div><div>Dart: 85c, 140r, 0.8s, 6 dmg, 10 DPS poison</div><div>Mine: 20c, 14 dmg, 40 splash</div><div>Wall: 15c</div></div>");
     lines.push("<div><strong>Enemy Stats</strong><div>Grunt: base HP 20 + 5*wave, base speed 26 + 2.6*wave</div><div>Speedy: faster version of grunt</div><div>Heavy: 2.4x HP, 0.6x speed</div><div>Boss: 6x HP</div><div>Tiers: +35% HP and +6% speed per tier</div></div>");
   }
   ui.encyclopedia.innerHTML = lines.length > 0 ? lines.join("") : "<div>Encounter enemies to learn about them.</div>";
@@ -805,7 +805,6 @@ function startWave() {
 function togglePauseWave() {
   if (!state.waveInProgress) return;
   if (!state.paused) {
-    state.portalClock += dt * 1000;
     if (!state.infiniteGold && state.gold <= 0) {
       flashButton(ui.pauseWave);
       return;
@@ -844,7 +843,7 @@ function spawnEnemy() {
     type = "labrat";
   } else if (roll < 0.42) {
     type = "diamond";
-  } else if (roll < 0.48) {
+  } else if (roll < 0.48 && state.wave >= 10) {
     type = "swarm";
   }
   let armored = false;
@@ -990,6 +989,10 @@ function placeTower(type, x, y) {
   if (type !== "wall" && type !== "op" && type !== "mine" && type !== "floorSpike" && type !== "drone") {
     if (!hasWall) return;
   }
+  if (type === "drone") {
+    if (hasWall) return;
+    if (isOnPath(x, y)) return;
+  }
   for (const tower of state.towers) {
     const towerData = towerTypes[tower.type];
     if (towerData && towerData.noGridlock) continue;
@@ -1115,17 +1118,23 @@ function placeTower(type, x, y) {
   updateHud();
 }
 
-function getUpgradeCost(tower) {
-  const baseCost = 50;
-  const level = tower.level || 1;
-  return baseCost * Math.pow(2, Math.max(0, level - 1));
+function getUpgradeBaseCost(tower) {
+  const cost = (towerTypes[tower.type] && towerTypes[tower.type].cost) ? towerTypes[tower.type].cost : 50;
+  const scaled = Math.round(cost * 0.45);
+  return Math.min(140, Math.max(40, scaled));
 }
 
-function getUpgradeCostToLevel(currentLevel, targetLevel) {
-  const baseCost = 50;
+function getUpgradeCost(tower) {
+  const baseCost = getUpgradeBaseCost(tower);
+  const level = tower.level || 1;
+  return baseCost * Math.pow(1.8, Math.max(0, level - 1));
+}
+
+function getUpgradeCostToLevel(currentLevel, targetLevel, tower) {
+  const baseCost = tower ? getUpgradeBaseCost(tower) : 50;
   let total = 0;
   for (let level = currentLevel; level < targetLevel; level += 1) {
-    total += baseCost * Math.pow(2, Math.max(0, level - 1));
+    total += baseCost * Math.pow(1.8, Math.max(0, level - 1));
   }
   return total;
 }
@@ -1218,6 +1227,7 @@ function getTowerStats(tower) {
   let dartBurstCount = 1;
   let dartEmbrittlementBonus = 0;
   let dartArmorWeaken = false;
+  let dartPoisonTransfer = false;
   let globalPoisonDps = 0;
   let globalPoisonDuration = 0;
   let spikeRange = data.spikeRange;
@@ -1647,6 +1657,7 @@ function getTowerStats(tower) {
         if (tier >= 5) {
           globalPoisonDps = 3;
           globalPoisonDuration = 2.5;
+          dartPoisonTransfer = true;
         }
       } else {
         if (tier >= 1) rate *= 0.85;
@@ -1778,6 +1789,7 @@ function getTowerStats(tower) {
     dartBurstCount,
     dartEmbrittlementBonus,
     dartArmorWeaken,
+    dartPoisonTransfer,
     globalPoisonDps,
     globalPoisonDuration,
     spikeRange,
@@ -2543,6 +2555,7 @@ function fireProjectile(tower, enemy, stats) {
       embrittlementPercent,
       poisonRadius,
       armorWeaken,
+      poisonTransfer: Boolean(stats.dartPoisonTransfer),
     });
   }
 }
@@ -2914,6 +2927,19 @@ function updateProjectiles(dt) {
               if (dist <= proj.poisonRadius) {
                 splash.dotTimer = Math.max(splash.dotTimer, proj.poisonDuration * 0.8);
                 splash.dotDps = Math.max(splash.dotDps, proj.poisonDps * 0.7);
+              }
+            }
+          }
+          if (proj.poisonTransfer) {
+            const radius = 70;
+            for (const splash of state.enemies) {
+              if (splash === proj.target) continue;
+              if (splash.hp <= 0) continue;
+              if (splash.darkMatter) continue;
+              const dist = Math.hypot(splash.x - proj.target.x, splash.y - proj.target.y);
+              if (dist <= radius) {
+                splash.dotTimer = Math.max(splash.dotTimer, proj.poisonDuration * 0.7);
+                splash.dotDps = Math.max(splash.dotDps, proj.poisonDps * 0.6);
               }
             }
           }
@@ -3793,7 +3819,7 @@ function updateEnemies(dt) {
       enemy.y = targetY;
       enemy.pathIndex = nextIndex;
       if (enemy.pathIndex >= pathPoints.length - 1) {
-        const hit = enemy.isBoss ? state.lives : (enemy.castleDamage || 1);
+        const hit = enemy.castleDamage || 1;
         state.lives = Math.max(0, state.lives - hit);
         enemy.escaped = true;
         enemy.hp = 0;
@@ -5201,18 +5227,18 @@ function drawFlames() {
       ctx.arc(flame.x, flame.y, radius, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      const steps = 6;
+      const steps = 10;
       for (let i = 1; i <= steps; i += 1) {
         const t = i / steps;
         const dist = flame.range * t;
-        const jitter = (Math.random() - 0.5) * 0.2;
+        const jitter = (Math.random() - 0.5) * 0.12;
         const angle = flame.angle + jitter;
         const x = flame.x + Math.cos(angle) * dist;
         const y = flame.y + Math.sin(angle) * dist;
-        const size = 5 + (1 - t) * 6;
+        const size = 4 + (1 - t) * 5;
         const grad = ctx.createRadialGradient(x, y, size * 0.2, x, y, size);
-        grad.addColorStop(0, "rgba(255, 153, 85, 0.95)");
-        grad.addColorStop(0.5, "rgba(249, 115, 22, 0.6)");
+        grad.addColorStop(0, "rgba(255, 153, 85, 0.98)");
+        grad.addColorStop(0.45, "rgba(249, 115, 22, 0.7)");
         grad.addColorStop(1, "rgba(30, 41, 59, 0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -5250,7 +5276,8 @@ function drawPlacementPreview() {
   const requiresWall = state.placing !== "wall" && state.placing !== "drone" && state.placing !== "op" && state.placing !== "mine" && state.placing !== "floorSpike";
   const invalidWall = requiresWall && !hasWall;
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
-  const invalid = invalidPath || invalidWall || invalidMine;
+  const invalidDrone = state.placing === "drone" && (hasWall || isOnPath(snapped.x, snapped.y));
+  const invalid = invalidPath || invalidWall || invalidMine || invalidDrone;
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -5578,7 +5605,7 @@ if (ui.upgradePanel) {
     const delta = Math.max(1, targetRaw);
     const target = Math.min(state.towerLevelCap, current + delta);
     if (target <= current) return;
-    const totalCost = getUpgradeCostToLevel(current, target);
+    const totalCost = getUpgradeCostToLevel(current, target, tower);
     if (!canAfford(totalCost)) {
       flashButton(ui.upgradeTo);
       return;
@@ -6046,7 +6073,7 @@ if (ui.jasperModal) {
 function resetGame() {
   state.lives = 100;
   state.maxLives = 100;
-  state.gold = 80;
+  state.gold = 200;
   state.wave = 0;
   state.totalDamage = 0;
   state.placing = null;

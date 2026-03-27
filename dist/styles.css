@@ -81,6 +81,12 @@ body {
   gap: 6px;
   font-size: 0.95rem;
 }
+.hud span {
+  display: inline-block;
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .play {
   display: grid;
