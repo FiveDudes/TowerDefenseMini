@@ -1553,15 +1553,11 @@ function handleClick(event) {
     }
   }
 
-  if (state.placing) {
-    placeTower(state.placing, snapped.x, snapped.y);
-    return;
-  }
-
   const trapHere = state.traps.find((trap) => Math.hypot(trap.x - x, trap.y - y) < (trap.hitRadius || 14));
   if (trapHere) {
     state.selectedTrap = trapHere;
     state.selectedTower = null;
+    state.placing = null;
     return;
   }
 
@@ -1572,6 +1568,10 @@ function handleClick(event) {
   }
   state.selectedTower = selected;
   state.selectedTrap = null;
+  if (selected) {
+    state.placing = null;
+    return;
+  }
   if (state.placing) {
     placeTower(state.placing, snapped.x, snapped.y);
   }
