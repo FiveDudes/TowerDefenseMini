@@ -349,7 +349,7 @@ const towerTypes = {
     damage: 20,
     color: "#f472b6",
     slow: 0,
-    spikeRange: 32,
+    spikeRange: 48,
     spikeExtendSpeed: 6,
     spikeRetractSpeed: 1.4,
     spikeHold: 0.6,
