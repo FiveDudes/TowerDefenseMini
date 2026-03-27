@@ -1864,6 +1864,17 @@ function handleClick(event) {
     return;
   }
 
+  for (const tower of state.towers) {
+    if (tower.type !== "drone") continue;
+    if (!Number.isFinite(tower.baseX) || !Number.isFinite(tower.baseY)) continue;
+    if (Math.hypot(tower.baseX - x, tower.baseY - y) <= 16) {
+      state.selectedTower = tower;
+      state.selectedTrap = null;
+      state.placing = null;
+      return;
+    }
+  }
+
   let selected = null;
   const towersHere = state.towers.filter((tower) => Math.hypot(tower.x - snapped.x, tower.y - snapped.y) < 20);
   if (state.placing) {
@@ -3645,6 +3656,23 @@ function drawTowers() {
         ctx.lineTo(tower.x, tower.y + 10);
         ctx.stroke();
       } else if (tower.type === "drone") {
+        if (Number.isFinite(tower.baseX) && Number.isFinite(tower.baseY)) {
+          ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+          ctx.beginPath();
+          ctx.arc(tower.baseX, tower.baseY, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(34, 211, 238, 0.85)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(tower.baseX, tower.baseY, 10, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(tower.baseX - 6, tower.baseY);
+          ctx.lineTo(tower.baseX + 6, tower.baseY);
+          ctx.stroke();
+        }
         ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
         ctx.beginPath();
         ctx.arc(tower.x, tower.y, 10, 0, Math.PI * 2);
