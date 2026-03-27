@@ -2987,6 +2987,9 @@ function updateNukeLaunches(dt) {
       const impactY = launch.end.y;
       state.projectiles = [];
       state.beams = [];
+      for (const enemy of state.enemies) {
+        enemy.revealed = false;
+      }
       state.explosions = [];
       state.nukeParticles = [];
       spawnNukeSmokeCloud(impactX, impactY, 520);
