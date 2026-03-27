@@ -73,6 +73,7 @@ const ui = {
   spawnEnemy: document.getElementById("spawn-enemy"),
   spawnEnemyType: document.getElementById("spawn-enemy-type"),
   spawnEnemyCount: document.getElementById("spawn-enemy-count"),
+  spawnEnemyRadioactive: document.getElementById("spawn-enemy-radioactive"),
   spawnEnemyArmored: document.getElementById("spawn-enemy-armored"),
   spawnEnemyDarkMatter: document.getElementById("spawn-enemy-darkmatter"),
   spawnEnemyOnFlame: document.getElementById("spawn-enemy-onflame"),
@@ -766,7 +767,7 @@ function createEnemy(type, options = {}) {
     speed *= 1.05;
   }
   const speedMultiplier = state.difficultyMultipliers.enemySpeed || 1;
-  const radioactive = state.radioactiveWave === state.wave;
+  const radioactive = options.radioactive || state.radioactiveWave === state.wave;
   if (radioactive) {
     maxHp *= 0.5;
     speed *= 0.5;
@@ -4553,21 +4554,22 @@ if (ui.jasperModal) {
   });
 }
 
-if (ui.spawnEnemy) {
-  ui.spawnEnemy.addEventListener("click", () => {
-    if (!state.infiniteGold) return;
-    const type = ui.spawnEnemyType?.value || "grunt";
-    const count = Math.max(1, Number.parseInt(ui.spawnEnemyCount?.value || "1", 10));
-    const armored = Boolean(ui.spawnEnemyArmored?.checked);
-    const darkMatter = Boolean(ui.spawnEnemyDarkMatter?.checked);
-    const onFlame = Boolean(ui.spawnEnemyOnFlame?.checked);
-    const poisoned = Boolean(ui.spawnEnemyPoisoned?.checked);
-    for (let i = 0; i < count; i += 1) {
-      registerEnemyInEncyclopedia(type, armored, darkMatter);
-      state.enemies.push(createEnemy(type, { armored, darkMatter, onFlame, poisoned }));
-    }
-  });
-}
+  if (ui.spawnEnemy) {
+    ui.spawnEnemy.addEventListener("click", () => {
+      if (!state.infiniteGold) return;
+      const type = ui.spawnEnemyType?.value || "grunt";
+      const count = Math.max(1, Number.parseInt(ui.spawnEnemyCount?.value || "1", 10));
+      const radioactive = Boolean(ui.spawnEnemyRadioactive?.checked);
+      const armored = Boolean(ui.spawnEnemyArmored?.checked);
+      const darkMatter = Boolean(ui.spawnEnemyDarkMatter?.checked);
+      const onFlame = Boolean(ui.spawnEnemyOnFlame?.checked);
+      const poisoned = Boolean(ui.spawnEnemyPoisoned?.checked);
+      for (let i = 0; i < count; i += 1) {
+        registerEnemyInEncyclopedia(type, armored, darkMatter);
+        state.enemies.push(createEnemy(type, { armored, darkMatter, onFlame, poisoned, radioactive }));
+      }
+    });
+  }
 
 const titleScreen = document.getElementById("title-screen");
 if (titleScreen) {
