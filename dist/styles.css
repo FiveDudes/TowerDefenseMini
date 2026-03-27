@@ -82,8 +82,8 @@ body {
 
 .play {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 8px;
   margin-top: 6px;
 }
 
@@ -102,24 +102,37 @@ body {
   margin-top: 0;
 }
 
-.btn-nuke {
+.btn-nuke,
+.game-actions .btn-nuke {
+  all: unset;
+  display: inline-block;
   width: 104px;
   height: 104px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #fecaca 0%, #ef4444 35%, #b91c1c 100%);
-  border: 2px solid #7f1d1d;
-  color: #fff;
-  font-size: 1rem;
-  letter-spacing: 0.12em;
-  box-shadow: 0 14px 24px rgba(127, 29, 29, 0.55), inset 0 -8px 18px rgba(0, 0, 0, 0.4);
+  background: transparent url("assets/nuke-button-flat.png") center / contain no-repeat !important;
+  cursor: pointer;
 }
 
 .btn-nuke:hover {
-  background: radial-gradient(circle at 30% 30%, #fee2e2 0%, #f87171 35%, #991b1b 100%);
+  filter: brightness(1.08) drop-shadow(0 0 12px rgba(248, 113, 113, 0.6)) drop-shadow(0 0 24px rgba(248, 113, 113, 0.35));
+  transform: scale(1.06);
+}
+
+.btn-nuke:focus,
+.btn-nuke:focus-visible,
+.btn-nuke:active {
+  filter: brightness(1.08) drop-shadow(0 0 12px rgba(248, 113, 113, 0.65)) drop-shadow(0 0 26px rgba(248, 113, 113, 0.4));
+  transform: scale(1.06);
 }
 
 .nuke-cost {
   font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.nuke-count {
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -170,8 +183,9 @@ canvas {
 
 .panel-grid {
   display: grid;
-  grid-template-columns: minmax(100px, 120px) minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: minmax(120px, 150px) minmax(0, 1fr);
+  gap: 10px;
+  justify-items: start;
 }
 
 .upgrade-panel {
@@ -188,6 +202,11 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.build-list button {
+  font-size: 0.6rem;
+  padding: 3px 4px;
 }
 
 .panel h2 {
@@ -263,6 +282,14 @@ button:hover {
   background: linear-gradient(120deg, rgba(96, 165, 250, 0.2), rgba(129, 140, 248, 0.2));
 }
 
+.btn-flame {
+  background: linear-gradient(120deg, rgba(251, 146, 60, 0.28), rgba(249, 115, 22, 0.22));
+}
+
+.btn-trap {
+  background: linear-gradient(120deg, rgba(250, 204, 21, 0.22), rgba(132, 204, 22, 0.18));
+}
+
 .btn-mine {
   background: linear-gradient(120deg, rgba(34, 197, 94, 0.2), rgba(14, 116, 144, 0.22));
 }
@@ -287,6 +314,7 @@ button:hover {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   overflow: visible;
   grid-column: 2 / -1;
+  width: 100%;
 }
 
 .upgrade-panel strong {
@@ -458,9 +486,18 @@ kbd {
 
 .difficulty-buttons {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 6px;
+  margin-bottom: 4px;
 }
 
+.difficulty-buttons + .difficulty-buttons {
+  margin-top: 12px;
+}
+
+.title-card .difficulty-buttons button {
+  padding: 8px 10px;
+}
 .title-screen.hidden {
   display: none;
 }

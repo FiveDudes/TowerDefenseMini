@@ -20,6 +20,9 @@
             <button data-difficulty="medium">Medium</button>
             <button data-difficulty="hard">Hard</button>
           </div>
+          <div class="difficulty-buttons">
+            <button id="open-tutorial">Tutorial</button>
+          </div>
         </div>
       </div>
       <div id="game-over" class="title-screen hidden">
@@ -54,8 +57,8 @@
         <div class="game-column">
           <canvas id="game" width="960" height="540"></canvas>
           <div class="game-actions">
-            <button id="nuke-button" class="btn-nuke">NUKE</button>
-            <div class="nuke-cost">Cost: 400</div>
+            <button id="nuke-button" class="btn-nuke" aria-label="Nuke"></button>
+            <div class="nuke-count" id="nuke-count">Nukes: 0</div>
           </div>
         </div>
         <aside class="panel">
@@ -67,7 +70,9 @@
               <button id="build-drone" class="btn-drone">Drone Tower (80)</button>
               <button id="build-bomb" class="btn-bomb">Bomb Tower (85)</button>
               <button id="build-laser" class="btn-laser">Laser Tower (100)</button>
+              <button id="build-flame" class="btn-flame">Flamethrower (90)</button>
               <button id="build-dart" class="btn-dart">Dart Tower (75)</button>
+              <button id="build-trap" class="btn-trap">Trap Setter (95)</button>
               <button id="build-mine" class="btn-mine">Landmine (30)</button>
               <button id="build-wall" class="btn-wall">Wall (10)</button>
             </div>
@@ -82,9 +87,45 @@
                 <span></span>
                 <button id="upgrade-to">Upgrade</button>
               </div>
+              <div class="control-row upgrade-target-row hidden" id="wall-upgrade-action">
+                <span></span>
+                <button id="upgrade-wall">Upgrade Wall</button>
+              </div>
+              <div class="control-row upgrade-target-row hidden" id="trap-upgrade-action">
+                <span></span>
+                <button id="upgrade-trap">Upgrade Trap</button>
+              </div>
               <div id="watch-upgrade-actions" class="upgrade-actions hidden">
                 <button id="watch-path-1" class="btn-watch">Path 1 Upgrade</button>
                 <button id="watch-path-2" class="btn-watch">Path 2 Upgrade</button>
+              </div>
+              <div id="freeze-upgrade-actions" class="upgrade-actions hidden">
+                <button id="freeze-path-1" class="btn-freeze">Path 1: Blizzard</button>
+                <button id="freeze-path-2" class="btn-freeze">Path 2: Permafrost</button>
+              </div>
+              <div id="bomb-upgrade-actions" class="upgrade-actions hidden">
+                <button id="bomb-path-1" class="btn-bomb">Path 1: Rocket Pods</button>
+                <button id="bomb-path-2" class="btn-bomb">Path 2: Cluster Shells</button>
+              </div>
+              <div id="trap-upgrade-actions" class="upgrade-actions hidden">
+                <button id="trap-path-1" class="btn-trap">Path 1: Turret Spawner</button>
+                <button id="trap-path-2" class="btn-trap">Path 2: Mine Layer</button>
+              </div>
+              <div id="laser-upgrade-actions" class="upgrade-actions hidden">
+                <button id="laser-path-1" class="btn-laser">Path 1: Overcharge</button>
+                <button id="laser-path-2" class="btn-laser">Path 2: Focus</button>
+              </div>
+              <div id="flame-upgrade-actions" class="upgrade-actions hidden">
+                <button id="flame-path-1" class="btn-flame">Path 1: Inferno</button>
+                <button id="flame-path-2" class="btn-flame">Path 2: Pyroclast</button>
+              </div>
+              <div id="drone-upgrade-actions" class="upgrade-actions hidden">
+                <button id="drone-path-1" class="btn-drone">Path 1: Missile Drone</button>
+                <button id="drone-path-2" class="btn-drone">Path 2: Drone Commander</button>
+              </div>
+              <div class="control-row targeting-row hidden" id="targeting-row">
+                <span>Target</span>
+                <button id="targeting-mode" class="btn-small" type="button">Target: First</button>
               </div>
             </div>
           </div>
@@ -122,13 +163,41 @@
         <div id="tips-modal-content" class="encyclopedia-content">
           <div class="tips-list">
             <p>Click a tower to upgrade (cost 50). Freeze towers reduce enemy speed.</p>
-            <p>Drone towers patrol around their build point. Laser towers pierce.</p>
-            <p>Press <kbd>Space</kbd> to start the next wave.</p>
+            <p>Drone towers can be upgraded via their base marker. Laser towers pierce.</p>
+            <p>Press <kbd>Space</kbd> to start or pause a wave.</p>
             <p>Right-click a tower to sell it for 80% back.</p>
+            <p>The Nuke clears the map and makes the next wave Radioactive, halving enemy health and speed.</p>
+            <p>Use Laser and Bomb towers to shred enemy armour in 2-3 hits, making them vulnerable to rapid-fire towers.</p>
+            <p>Position Laser towers to fire down long straight paths to maximize their infinite beam collateral damage.</p>
+            <p>The Freezer tower's slowing aura is most effective at chokepoints where towers have high AOE damage.</p>
+            <p>The Flamethrower deals damage over time; place it early in the path to weaken enemies for the finish.</p>
           </div>
         </div>
         <div class="encyclopedia-actions">
           <button id="close-tips" class="btn-secondary" type="button" data-close="tips">Close</button>
+        </div>
+      </div>
+    </div>
+    <div id="tutorial-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
+      <div class="encyclopedia-card">
+        <div class="encyclopedia-header">
+          <span class="encyclopedia-icon">?</span>
+          <span class="encyclopedia-title">HOW TO PLAY</span>
+        </div>
+        <div id="tutorial-modal-content" class="encyclopedia-content">
+          <div class="tips-list">
+            <p>Start a wave to spawn enemies. Press <kbd>Space</kbd> to start or pause a wave.</p>
+            <p>Build towers only on walls or the void, not on the path. Enemies follow the glowing path.</p>
+            <p>Watch and Laser towers deal direct damage. Freeze slows. Bombs splash. Darts poison. Drones can be upgraded via their base.</p>
+            <p>Flamethrowers burn targets in a cone and leave a DOT after enemies exit range. Trap Setters spawn traps on the path.</p>
+            <p>Upgrade a tower by clicking it, then clicking again. Right-click sells for 80% back.</p>
+            <p>Use the Target button to change tower priority: First, Last, Strongest, or Weakest.</p>
+            <p>The Nuke is a one-time use weapon of last resort that halves tower stats but deals devastating damage to enemies.</p>
+            <p>Lose a life when an enemy reaches your castle. Survive as many waves as you can.</p>
+          </div>
+        </div>
+        <div class="encyclopedia-actions">
+          <button id="close-tutorial" class="btn-secondary" type="button" data-close="tutorial">Close</button>
         </div>
       </div>
     </div>
@@ -164,12 +233,17 @@
               <option value="speedy">Speedy</option>
               <option value="heavy">Heavy</option>
               <option value="stealth">Stealth</option>
+              <option value="labrat">Lab Rat</option>
               <option value="boss">Boss</option>
             </select>
             <input id="spawn-enemy-count" class="spawn-count" type="number" min="1" value="1" />
             <button id="spawn-enemy">Spawn</button>
           </div>
           <div class="control-row">
+            <label>
+              <input id="spawn-enemy-radioactive" type="checkbox" />
+              Radioactive
+            </label>
             <label>
               <input id="spawn-enemy-armored" type="checkbox" />
               Armored
