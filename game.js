@@ -4702,6 +4702,15 @@ function tryUnlockOpTower() {
   }
 }
 
+function unlockJasperMenu() {
+  if (state.easterUnlocked) return;
+  state.easterUnlocked = true;
+  if (ui.openJasper) ui.openJasper.classList.remove("hidden");
+  if (ui.jasperControls) {
+    ui.jasperControls.classList.remove("hidden");
+  }
+}
+
 function tryUnlockInfiniteGold() {
   if (state.infiniteGold) return;
   if (state.jasperProgress < 6) return;
@@ -4752,6 +4761,9 @@ window.addEventListener("keydown", (event) => {
       state.jasperProgress += 1;
     } else {
       state.jasperProgress = key === "j" ? 1 : 0;
+    }
+    if (state.jasperProgress >= 6) {
+      unlockJasperMenu();
     }
     tryUnlockOpTower();
     tryUnlockInfiniteGold();
