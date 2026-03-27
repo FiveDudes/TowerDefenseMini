@@ -470,6 +470,11 @@ kbd {
   user-select: none;
 }
 
+.title-screen,
+.title-screen * {
+  cursor: pointer;
+}
+
 .title-screen * {
   pointer-events: auto;
   pointer-events: all;

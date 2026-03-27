@@ -5689,11 +5689,15 @@ if (titleScreen) {
   });
 }
 
-document.addEventListener("pointerup", (event) => {
+const handleTitleScreenPointer = (event) => {
   if (!titleScreen || titleScreen.classList.contains("hidden")) return;
-  const target = event.target;
-  if (!(target instanceof Element)) return;
-  const difficultyButton = target.closest("[data-difficulty]");
+  const target = event.target instanceof Element ? event.target : null;
+  let clicked = target;
+  if (event && "clientX" in event && "clientY" in event) {
+    const el = document.elementFromPoint(event.clientX, event.clientY);
+    if (el instanceof Element) clicked = el;
+  }
+  const difficultyButton = clicked?.closest?.("[data-difficulty]");
   if (difficultyButton) {
     event.preventDefault();
     event.stopPropagation();
@@ -5703,11 +5707,28 @@ document.addEventListener("pointerup", (event) => {
     }
     return;
   }
-  const tutorialButton = target.closest("#open-tutorial");
+  const tutorialButton = clicked?.closest?.("#open-tutorial");
   if (tutorialButton) {
     openTutorialModal(event);
   }
-}, true);
+};
+
+document.addEventListener("pointerup", handleTitleScreenPointer, true);
+document.addEventListener("mousedown", handleTitleScreenPointer, true);
+document.addEventListener("touchstart", handleTitleScreenPointer, { capture: true, passive: false });
+
+document.addEventListener("keydown", (event) => {
+  if (!titleScreen || titleScreen.classList.contains("hidden")) return;
+  if (event.key === "1") {
+    selectDifficulty("easy");
+  } else if (event.key === "2") {
+    selectDifficulty("medium");
+  } else if (event.key === "3") {
+    selectDifficulty("hard");
+  } else if (event.key.toLowerCase() === "t") {
+    openTutorialModal(event);
+  }
+});
 
 if (ui.encyclopediaModal) {
   ui.encyclopediaModal.classList.add("hidden");
