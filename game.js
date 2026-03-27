@@ -4529,6 +4529,7 @@ if (ui.tutorialModal) {
 
 if (ui.openJasper) {
   ui.openJasper.addEventListener("click", () => {
+    if (!state.easterUnlocked) return;
     ui.jasperModal?.classList.remove("hidden");
   });
 }
