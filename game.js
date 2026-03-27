@@ -72,6 +72,7 @@ const ui = {
   dronePath1: document.getElementById("drone-path-1"),
   dronePath2: document.getElementById("drone-path-2"),
   jasperControls: document.getElementById("jasper-controls"),
+  towerLevelCap: document.getElementById("tower-level-cap"),
   setWave: document.getElementById("set-wave"),
   applyWave: document.getElementById("apply-wave"),
   waveSpeed: document.getElementById("wave-speed"),
@@ -150,6 +151,7 @@ const state = {
   revealStealth: false,
   autoWave: false,
   waveSpeed: 1,
+  towerLevelCap: 5,
   difficultyMultipliers: {
     enemyHp: 1,
     enemySpeed: 1,
@@ -975,8 +977,8 @@ function getUpgradeCostToLevel(currentLevel, targetLevel) {
 function upgradeTower(tower) {
   if (tower.type === "wall" || tower.type === "mine") return;
   const level = tower.level || 1;
-  if (tower.type === "bomb" && level >= 5) return;
-  if (level >= 5) return;
+  if (tower.type === "bomb" && level >= state.towerLevelCap) return;
+  if (level >= state.towerLevelCap) return;
   const upgradeCost = getUpgradeCost(tower);
   if (!canAfford(upgradeCost)) {
     flashButton(ui.upgradePanel);
@@ -1582,7 +1584,7 @@ function updateUpgradePanel() {
   const nextTier = (tower.level || 1) + 1;
   const upgradeCost = getUpgradeCost(tower);
   let upgradeText = "Upgrades: +damage, +range, faster fire, faster bullets.";
-  const bombMaxed = tower.type === "bomb" && (tower.level || 1) >= 5;
+  const bombMaxed = tower.type === "bomb" && (tower.level || 1) >= state.towerLevelCap;
   if (tower.type === "freeze") {
     upgradeText = "Upgrades: stronger slow + longer range.";
   }
@@ -1793,9 +1795,10 @@ function updateUpgradePanel() {
   const burnText = stats.fireDps > 0 ? ` | Burn ${stats.fireDps.toFixed(1)}/s (${stats.fireDuration.toFixed(1)}s)` : "";
   const speedText = stats.projectileSpeed ? ` | Shot Spd ${Math.round(stats.projectileSpeed)}` : "";
   const statLine = `Range ${Math.round(stats.range)} | Rate ${stats.rate.toFixed(2)}s | Damage ${Math.round(stats.damage)}${tower.type === "freeze" ? ` | Slow ${stats.slow.toFixed(2)}` : ""}${speedText}${burnText}`;
+  const cap = state.towerLevelCap || 5;
   if (bombMaxed) {
     ui.upgradeDetails.textContent = `MAX TIER.\n\n${desc}\n\n${upgradeText}\n\n${statLine}`;
-  } else if ((tower.level || 1) >= 5) {
+  } else if ((tower.level || 1) >= cap) {
     ui.upgradeDetails.textContent = `MAX TIER.\n\n${desc}\n\n${tower.type === "laser" ? "From tier 3 there is burning.\n\n" : ""}${upgradeText}\n\n${statLine}`;
   } else {
     ui.upgradeDetails.textContent = `Next: Tier ${nextTier} (Cost ${upgradeCost}).\n\n${desc}\n\n${tower.type === "laser" ? "From tier 3 there is burning.\n\n" : ""}${upgradeText}\n\n${statLine}`;
@@ -4615,17 +4618,17 @@ if (ui.upgradePanel) {
   });
 }
 
-if (ui.upgradeTo) {
+  if (ui.upgradeTo) {
   ui.upgradeTo.addEventListener("click", (event) => {
     event.stopPropagation();
     const tower = state.selectedTower;
     if (!tower) return;
     if (tower.type === "wall" || tower.type === "mine") return;
-    if (tower.type === "bomb" && (tower.level || 1) >= 5) return;
+    if (tower.type === "bomb" && (tower.level || 1) >= state.towerLevelCap) return;
     const current = tower.level || 1;
     const targetRaw = Number.parseInt(ui.upgradeTarget?.value || `${current}`, 10);
     if (!Number.isFinite(targetRaw)) return;
-    const target = Math.max(1, Math.min(5, targetRaw));
+    const target = Math.max(1, Math.min(state.towerLevelCap, targetRaw));
     if (target <= current) return;
     const totalCost = getUpgradeCostToLevel(current, target);
     if (!canAfford(totalCost)) {
@@ -4888,6 +4891,17 @@ if (ui.waveSpeed) {
   });
 }
 
+if (ui.towerLevelCap) {
+  ui.towerLevelCap.addEventListener("change", () => {
+    if (!state.infiniteGold) return;
+    const raw = Number.parseInt(ui.towerLevelCap.value || "5", 10);
+    const cap = Math.max(1, Math.min(10, Number.isFinite(raw) ? raw : 5));
+    state.towerLevelCap = cap;
+    ui.towerLevelCap.value = `${cap}`;
+    updateUpgradePanel();
+  });
+}
+
 if (ui.autoWave) {
   ui.autoWave.addEventListener("click", () => {
     if (!state.infiniteGold) return;
@@ -5096,6 +5110,7 @@ function resetGame() {
   state.revealStealth = false;
   state.autoWave = false;
   state.waveSpeed = 1;
+  state.towerLevelCap = 5;
   state.infiniteGold = false;
   state.keyBuffer = "";
   state.jasperProgress = 0;
@@ -5103,6 +5118,7 @@ function resetGame() {
   if (ui.jasperControls) ui.jasperControls.classList.add("hidden");
   if (ui.autoWave) ui.autoWave.textContent = "Auto Next Wave: Off";
   if (ui.waveSpeed) ui.waveSpeed.value = "1";
+  if (ui.towerLevelCap) ui.towerLevelCap.value = "5";
   if (ui.setWave) ui.setWave.value = "1";
   if (ui.buildOp) ui.buildOp.classList.add("hidden");
   if (ui.buildOp) ui.buildOp.disabled = false;
