@@ -3761,9 +3761,7 @@ function updateNukeSmoke(dt) {
 }
 
 function triggerScreenShake(power, duration) {
-  state.screenShakePower = Math.max(state.screenShakePower, power);
-  state.screenShakeDuration = Math.max(state.screenShakeDuration, duration);
-  state.screenShakeTime = Math.max(state.screenShakeTime, duration);
+  return;
 }
 
 function getScreenShakeOffset() {
