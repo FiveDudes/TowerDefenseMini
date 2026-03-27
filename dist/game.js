@@ -378,6 +378,10 @@ const towerTypes = {
     allowOnPath: true,
     isFloorSpike: true,
     noGridlock: true,
+    triggerRadius: 18,
+    spikeExtendSpeed: 10,
+    spikeRetractSpeed: 7,
+    spikeHold: 0.2,
   },
   wall: {
     cost: 10,
@@ -3437,6 +3441,75 @@ function updateTowers(dt) {
   }
 }
 
+function updateFloorSpikes(dt) {
+  const data = towerTypes.floorSpike;
+  if (!data) return;
+  const damage = data.damage || 0;
+  const triggerRadius = data.triggerRadius || 18;
+  const extendSpeed = data.spikeExtendSpeed || 9;
+  const retractSpeed = data.spikeRetractSpeed || 7;
+  const holdTime = data.spikeHold || 0.25;
+  for (const spike of state.towers) {
+    if (spike.type !== "floorSpike") continue;
+    const phase = spike.spikePhase || "idle";
+    const progress = spike.spikeProgress || 0;
+    const findTarget = () => {
+      let best = null;
+      let bestDist = Infinity;
+      for (const enemy of state.enemies) {
+        if (enemy.hp <= 0) continue;
+        const dist = Math.hypot(enemy.x - spike.x, enemy.y - spike.y);
+        if (dist <= triggerRadius && dist < bestDist) {
+          bestDist = dist;
+          best = enemy;
+        }
+      }
+      return best;
+    };
+    if (phase === "idle") {
+      const target = findTarget();
+      if (target) {
+        spike.spikePhase = "extend";
+        spike.spikeProgress = 0;
+        spike.spikeHit = false;
+      }
+      continue;
+    }
+    if (phase === "extend") {
+      const next = Math.min(1, progress + dt * extendSpeed);
+      spike.spikeProgress = next;
+      const target = findTarget();
+      if (target && !spike.spikeHit && next >= 0.65) {
+        applyDamage(target, damage);
+        spike.spikeHit = true;
+        spike.spikeHoldTimer = holdTime;
+        spike.spikePhase = "hold";
+        continue;
+      }
+      if (next >= 1) {
+        spike.spikePhase = "hold";
+        spike.spikeHoldTimer = holdTime;
+      }
+      continue;
+    }
+    if (phase === "hold") {
+      spike.spikeHoldTimer = Math.max(0, (spike.spikeHoldTimer || 0) - dt);
+      if (spike.spikeHoldTimer <= 0) {
+        spike.spikePhase = "retract";
+      }
+      continue;
+    }
+    if (phase === "retract") {
+      const next = Math.max(0, progress - dt * retractSpeed);
+      spike.spikeProgress = next;
+      if (next <= 0) {
+        spike.spikePhase = "idle";
+        spike.spikeHit = false;
+      }
+    }
+  }
+}
+
 function updateEnemies(dt) {
   for (const enemy of state.enemies) {
     if (enemy.hp <= 0) {
@@ -3445,23 +3518,6 @@ function updateEnemies(dt) {
   }
   state.enemies = state.enemies.filter((enemy) => enemy.hp > 0 || !enemy.deadProcessed);
   for (const enemy of state.enemies) {
-    const floorSpikeDamage = (towerTypes.floorSpike ? towerTypes.floorSpike.damage : undefined) || 0;
-    if (floorSpikeDamage > 0) {
-      for (const spike of state.towers) {
-        if (spike.type !== "floorSpike") continue;
-        const dist = Math.hypot(enemy.x - spike.x, enemy.y - spike.y);
-        if (dist <= 12) {
-          applyDamage(enemy, floorSpikeDamage * dt);
-          if (enemy.hp <= 0) {
-            handleEnemyDeath(enemy);
-            break;
-          }
-        }
-      }
-      if (enemy.hp <= 0) {
-        continue;
-      }
-    }
     if (enemy.slowTimer > 0) {
       enemy.slowTimer -= dt;
     }
@@ -4218,13 +4274,29 @@ function drawMines() {
       ctx.stroke();
       continue;
     }
-    ctx.fillStyle = data.color || "#f97316";
-    ctx.beginPath();
-    ctx.moveTo(tower.x - 8, tower.y + 6);
-    ctx.lineTo(tower.x + 8, tower.y + 6);
-    ctx.lineTo(tower.x, tower.y - 8);
-    ctx.closePath();
-    ctx.fill();
+    const base = data.color || "#f97316";
+    const stroke = shadeColor(base, 0.6);
+    const progress = tower.spikeProgress || 0;
+    const height = 4 + 10 * progress;
+    ctx.fillStyle = shadeColor(base, 0.6);
+    ctx.fillRect(tower.x - 14, tower.y - 14, 28, 28);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tower.x - 14, tower.y - 14, 28, 28);
+    ctx.fillStyle = shadeColor(base, 1.1);
+    const offsets = [-8, 0, 8];
+    for (const ox of offsets) {
+      for (const oy of offsets) {
+        const sx = tower.x + ox;
+        const sy = tower.y + oy;
+        ctx.beginPath();
+        ctx.moveTo(sx - 3, sy + 4);
+        ctx.lineTo(sx + 3, sy + 4);
+        ctx.lineTo(sx, sy + 4 - height);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
   }
 }
 
@@ -5082,6 +5154,7 @@ function update(dt) {
   }
   updateSpawner(dt);
   updateEnemies(simDt);
+  updateFloorSpikes(simDt);
   updateMines();
   updateTraps(simDt);
   updateTowers(simDt);
