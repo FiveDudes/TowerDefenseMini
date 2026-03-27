@@ -166,7 +166,13 @@ const state = {
     enemySpeed: 1,
     gold: 1,
   },
-  shadowSeeds: [],
+  shadowSeeds: Array.from({ length: 8 }, (_, i) => ({
+    x: (i * 137) % 960,
+    y: (i * 83) % 540,
+    speed: 5 + (i % 3) * 3,
+    size: 22 + (i % 4) * 6,
+  })),
+  portalClock: 0,
   nukeLaunches: [],
   nukeParticles: [],
   screenShakeTime: 0,
@@ -604,6 +610,12 @@ function sellTower(tower) {
       state.selectedTrap = null;
     }
   }
+  if (tower.type === "drone" && tower.spawnedMinis) {
+    for (const mini of tower.spawnedMinis) {
+      state.towers = state.towers.filter((entry) => entry !== mini);
+    }
+    tower.spawnedMinis = [];
+  }
   state.towers = state.towers.filter((entry) => entry !== tower);
   if (tower.type === "wall") {
     recomputeGlobalPath();
@@ -767,6 +779,7 @@ function startWave() {
 function togglePauseWave() {
   if (!state.waveInProgress) return;
   if (!state.paused) {
+    state.portalClock += dt * 1000;
     if (!state.infiniteGold && state.gold <= 0) {
       flashButton(ui.pauseWave);
       return;
@@ -937,18 +950,6 @@ function createEnemy(type, options = {}) {
 
 function getEnemyPosition(enemy) {
   return { x: enemy.x, y: enemy.y };
-}
-
-function getMiniDroneOffsets(tower, count) {
-  const offsets = [];
-  if (!count || count <= 0) return offsets;
-  const base = tower.miniAngle || 0;
-  const radius = 18;
-  for (let i = 0; i < count; i += 1) {
-    const angle = base + (i / count) * Math.PI * 2;
-    offsets.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
-  }
-  return offsets;
 }
 
 function placeTower(type, x, y) {
@@ -1149,6 +1150,7 @@ function getTowerStats(tower) {
   let freezePulseInterval = 0;
   let freezePulseDuration = 0;
   let freezePulseOnly = false;
+  let freezePulseDamage = 0;
   let freezeExposureThreshold = 0;
   let freezeExposureDuration = 0;
   let freezeKnockbackChance = 0;
@@ -1395,9 +1397,9 @@ function getTowerStats(tower) {
         if (tier >= 5) {
           rate *= 0.65;
           droneMiniCount = 2;
-          droneBombDamage = damage * 2.2;
-          droneBombRadius = 60;
-          droneBombRate = 2.2;
+          droneBombDamage = 0;
+          droneBombRadius = 0;
+          droneBombRate = 0;
         }
       }
     }
@@ -1453,6 +1455,10 @@ function getTowerStats(tower) {
           freezeDamage = Math.max(freezeDamage, 12);
           freezePulseInterval = Math.max(0.7, freezePulseInterval);
         }
+        if (freezePulseOnly) {
+          freezePulseDamage = Math.max(freezePulseDamage, freezeDamage);
+          freezeDamage = 0;
+        }
       }
     }
     if (tower.type === "bomb") {
@@ -1474,6 +1480,7 @@ function getTowerStats(tower) {
           bombBurstCount = 6;
           rate *= 0.4;
           bombProjectileKind = "rocket";
+          range += 60;
         }
         if (tier >= 5) {
           bombBurstCount = 12;
@@ -1481,6 +1488,7 @@ function getTowerStats(tower) {
           data.splashRadius += 18;
           rate = Math.min(rate, 0.25);
           bombProjectileKind = "rocket";
+          range += 90;
         }
       } else {
         if (tier >= 1) {
@@ -1615,6 +1623,7 @@ function getTowerStats(tower) {
     freezePulseInterval,
     freezePulseDuration,
     freezePulseOnly,
+    freezePulseDamage,
     freezeExposureThreshold,
     freezeExposureDuration,
     freezeKnockbackChance,
@@ -2141,9 +2150,10 @@ function handleClick(event) {
 
   let selected = null;
   const towersHere = state.towers.filter((tower) => Math.hypot(tower.x - snapped.x, tower.y - snapped.y) < 20);
+  const selectableHere = towersHere.filter((tower) => !tower.isMini);
   if (state.placing) {
     if (state.placing === "wall") {
-      const wallHere = towersHere.find((tower) => tower.type === "wall");
+      const wallHere = selectableHere.find((tower) => tower.type === "wall");
       if (wallHere) {
         state.selectedTower = wallHere;
         state.selectedTrap = null;
@@ -2151,16 +2161,16 @@ function handleClick(event) {
         return;
       }
     } else {
-      const hasNonWall = towersHere.some((tower) => tower.type !== "wall");
+      const hasNonWall = selectableHere.some((tower) => tower.type !== "wall");
       if (!hasNonWall) {
         placeTower(state.placing, snapped.x, snapped.y);
         return;
       }
     }
   }
-  if (towersHere.length > 0) {
-    const wall = towersHere.find((tower) => tower.type === "wall");
-    const nonWall = towersHere.find((tower) => tower.type !== "wall");
+  if (selectableHere.length > 0) {
+    const wall = selectableHere.find((tower) => tower.type === "wall");
+    const nonWall = selectableHere.find((tower) => tower.type !== "wall");
     if (wall && nonWall) {
       selected = nonWall;
     } else {
@@ -2209,6 +2219,7 @@ function emitFreezeGas(tower, enemy, stats) {
       pulseInterval: stats.freezePulseInterval || 0,
       pulseDuration: stats.freezePulseDuration || 0,
       pulseOnly: stats.freezePulseOnly || false,
+      pulseDamage: stats.freezePulseDamage || 0,
       exposureThreshold: stats.freezeExposureThreshold || 0,
       exposureDuration: stats.freezeExposureDuration || 0,
       knockbackChance: stats.freezeKnockbackChance || 0,
@@ -2225,6 +2236,7 @@ function emitFreezeGas(tower, enemy, stats) {
     proj.pulseInterval = stats.freezePulseInterval || 0;
     proj.pulseDuration = stats.freezePulseDuration || 0;
     proj.pulseOnly = stats.freezePulseOnly || false;
+    proj.pulseDamage = stats.freezePulseDamage || 0;
     proj.exposureThreshold = stats.freezeExposureThreshold || 0;
     proj.exposureDuration = stats.freezeExposureDuration || 0;
     proj.knockbackChance = stats.freezeKnockbackChance || 0;
@@ -2300,7 +2312,9 @@ function fireProjectile(tower, enemy, stats) {
           y: tower.y,
           target: enemy,
           targetPos: getEnemyPosition(enemy),
-          speed: missileSpeed,
+          speed: Math.min(140, missileSpeed),
+          maxSpeed: Math.max(missileSpeed, 320),
+          accel: 220,
           damage: missileDamage,
           splashRadius: missileSplash,
           sourceType,
@@ -2325,7 +2339,9 @@ function fireProjectile(tower, enemy, stats) {
         y: tower.y,
         target: enemy,
         targetPos: getEnemyPosition(enemy),
-        speed: stats.projectileSpeed || data.projectileSpeed || 260,
+        speed: stats.bombProjectileKind === "rocket" ? 140 : (stats.projectileSpeed || data.projectileSpeed || 260),
+        maxSpeed: stats.bombProjectileKind === "rocket" ? Math.max(320, (stats.projectileSpeed || data.projectileSpeed || 260) * 1.4) : undefined,
+        accel: stats.bombProjectileKind === "rocket" ? 240 : undefined,
         damage,
         splashRadius: data.splashRadius,
         sourceType,
@@ -2565,6 +2581,13 @@ function updateProjectiles(dt) {
             enemy.freezePulseCooldown = Math.max(0, enemy.freezePulseCooldown || 0);
             if ((enemy.freezePulseCooldown || 0) <= 0) {
               enemy.stunTimer = Math.max(enemy.stunTimer || 0, proj.pulseDuration);
+              if (proj.pulseDamage > 0) {
+                applyDamage(enemy, proj.pulseDamage);
+                if (enemy.hp <= 0) {
+                  handleEnemyDeath(enemy);
+                  continue;
+                }
+              }
               enemy.freezePulseCooldown = proj.pulseInterval;
               pulseTriggered = true;
             }
@@ -2605,6 +2628,10 @@ function updateProjectiles(dt) {
       if (proj.target && proj.target.hp > 0) {
         proj.targetPos = targetPos;
       }
+      if (proj.kind === "rocket" && proj.accel) {
+        const maxSpeed = proj.maxSpeed || proj.speed;
+        proj.speed = Math.min(maxSpeed, proj.speed + proj.accel * dt);
+      }
       const dx = targetPos.x - proj.x;
       const dy = targetPos.y - proj.y;
       const dist = Math.hypot(dx, dy) || 1;
@@ -2619,7 +2646,7 @@ function updateProjectiles(dt) {
           ttl: 0.35,
           color: isMissile ? "rgba(251, 146, 60, 0.6)" : "rgba(251, 113, 133, 0.6)",
         });
-        if (proj.sourceType === "bomb") {
+        if (proj.sourceType === "bomb" || proj.kind === "rocket") {
           pushShockwave(targetPos.x, targetPos.y, proj.splashRadius, "rgba(248, 113, 113, 0.5)");
         }
         for (const enemy of state.enemies) {
@@ -2905,11 +2932,12 @@ function updateTowerMovement(dt) {
     }
     let target = null;
     let nearestDist = Infinity;
+    const chaseRange = tower.isMini ? Math.hypot(canvas.width, canvas.height) * 1.2 : data.range;
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0) continue;
       const pos = getEnemyPosition(enemy);
       const dist = Math.hypot(pos.x - tower.x, pos.y - tower.y);
-      if (dist <= data.range && dist < nearestDist) {
+      if (dist <= chaseRange && dist < nearestDist) {
         target = pos;
         nearestDist = dist;
       }
@@ -2933,7 +2961,7 @@ function updateTowerMovement(dt) {
     }
   }
 
-  const drones = state.towers.filter((tower) => tower.type === "drone");
+  const drones = state.towers.filter((tower) => tower.type === "drone" && !tower.isMini);
   for (let i = 0; i < drones.length; i += 1) {
     for (let j = i + 1; j < drones.length; j += 1) {
       const a = drones[i];
@@ -3270,43 +3298,40 @@ function updateTowers(dt) {
     if (tower.type === "drone" && stats.droneBombRate > 0) {
       tower.bombCooldown = Math.max(0, (tower.bombCooldown || 0) - dt);
     }
-    if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0) {
-      tower.miniAngle = (tower.miniAngle || 0) + dt * 0.9;
-    }
     tower.cooldown = Math.max(0, tower.cooldown - dt);
     const range = stats.range;
     const target = selectTarget(tower, stats);
     if (target) {
       tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
     }
-    if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0) {
-      tower.miniCooldown = Math.max(0, (tower.miniCooldown || 0) - dt);
-      if (tower.miniCooldown <= 0 && target) {
-        const miniDamage = stats.damage * (stats.droneMiniDamageMult || 0.7);
-        const offsets = getMiniDroneOffsets(tower, stats.droneMiniCount);
-        for (const offset of offsets) {
-          const ox = tower.x + offset.x;
-          const oy = tower.y + offset.y;
-          const mini = {
-            type: "drone",
-            x: ox,
-            y: oy,
-            baseX: ox,
-            baseY: oy,
-            level: Math.max(1, (tower.level || 1) - 1),
-            cooldown: 0,
-            paidCost: 0,
-            disabled: false,
-            targeting: tower.targeting || "first",
-            isMini: true,
-            parentDrone: tower,
-          };
-          const miniStats = getTowerStats(mini);
-          miniStats.damage = Math.max(1, miniDamage);
-          fireProjectile(mini, target, miniStats);
-        }
-        tower.miniCooldown = Math.max(0.2, stats.rate * 0.7);
+    if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0 && !tower.isMini) {
+      if (!tower.spawnedMinis) {
+        tower.spawnedMinis = [];
       }
+      const miniTargetCount = stats.droneMiniCount;
+      while (tower.spawnedMinis.length < miniTargetCount) {
+        const offset = tower.spawnedMinis.length === 0 ? { x: -18, y: -10 } : { x: 18, y: -10 };
+        const ox = tower.x + offset.x;
+        const oy = tower.y + offset.y;
+        const mini = {
+          type: "drone",
+          x: ox,
+          y: oy,
+          baseX: ox,
+          baseY: oy,
+          level: Math.max(1, (tower.level || 1) - 1),
+          cooldown: 0,
+          paidCost: 0,
+          disabled: false,
+          targeting: tower.targeting || "first",
+          upgradePath: tower.upgradePath || 2,
+          isMini: true,
+          parentDrone: tower,
+        };
+        state.towers.push(mini);
+        tower.spawnedMinis.push(mini);
+      }
+      tower.spawnedMinis = tower.spawnedMinis.filter((mini) => state.towers.includes(mini));
     }
     if (tower.type === "laser" && stats.laserContinuous) {
       if (tower.laserOverheatTimer > 0) {
@@ -4014,6 +4039,63 @@ function drawPath() {
   ctx.restore();
 }
 
+function drawPortal() {
+  const points = state.pathPoints.length > 0 ? state.pathPoints : path;
+  const origin = points[0];
+  const t = state.portalClock;
+  const pulse = 0.5 + Math.sin(t * 0.004) * 0.5;
+  const outer = 26 + pulse * 6;
+  ctx.save();
+  const glow = ctx.createRadialGradient(origin.x, origin.y, 4, origin.x, origin.y, outer + 16);
+  glow.addColorStop(0, "rgba(217, 70, 239, 0.95)");
+  glow.addColorStop(0.5, "rgba(147, 51, 234, 0.6)");
+  glow.addColorStop(1, "rgba(147, 51, 234, 0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, outer + 16, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(217, 70, 239, 0.75)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, outer, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(168, 85, 247, 0.7)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, outer - 6, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(10, 7, 20, 0.9)";
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, outer - 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  const arcs = 5;
+  for (let i = 0; i < arcs; i += 1) {
+    const start = (t * 0.002 + i * 1.4) % (Math.PI * 2);
+    const end = start + 0.6 + Math.sin(t * 0.003 + i) * 0.2;
+    ctx.strokeStyle = "rgba(192, 132, 252, 0.6)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, outer - 2 - i, start, end);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 6; i += 1) {
+    const angle = t * 0.004 + i * 1.1;
+    const r = outer - 10 + Math.sin(t * 0.005 + i) * 4;
+    const x = origin.x + Math.cos(angle) * r;
+    const y = origin.y + Math.sin(angle) * r;
+    ctx.fillStyle = "rgba(233, 213, 255, 0.7)";
+    ctx.beginPath();
+    ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function getCastlePoint() {
   const points = state.pathPoints.length > 0 ? state.pathPoints : path;
   return points[points.length - 1];
@@ -4275,14 +4357,6 @@ function drawTowers() {
         }
         const miniScale = tower.isMini ? 0.65 : 1;
         drawDroneBody(tower.x, tower.y, miniScale, base);
-        if (!tower.isMini) {
-          const stats = getTowerStats(tower);
-          const miniCount = stats ? stats.droneMiniCount || 0 : 0;
-          const offsets = getMiniDroneOffsets(tower, miniCount);
-          for (const offset of offsets) {
-            drawDroneBody(tower.x + offset.x, tower.y + offset.y, 0.55, base);
-          }
-        }
       } else if (tower.type === "spikeTower") {
         const base = data.color || "#fb7185";
         const stroke = shadeColor(base, 0.55);
@@ -4915,7 +4989,16 @@ function drawBackground() {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  for (const shadow of state.shadowSeeds) {
+    const x = (shadow.x + performance.now() * 0.02 * shadow.speed) % (canvas.width + 120) - 60;
+    const y = (shadow.y + performance.now() * 0.015 * shadow.speed) % (canvas.height + 120) - 60;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+    ctx.beginPath();
+    ctx.arc(x, y, shadow.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
   drawGrid();
+  drawPortal();
   drawCastle();
   drawPath();
 }
@@ -5623,6 +5706,7 @@ function resetGame() {
   state.beams = [];
   state.explosions = [];
   state.flames = [];
+  state.portalClock = 0;
   state.traps = [];
   state.nukeLaunches = [];
   state.nukeParticles = [];
@@ -5828,7 +5912,7 @@ canvas.addEventListener("contextmenu", (event) => {
   const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
   const snapped = snapToGrid(x, y);
-  const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20);
+  const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20 && !entry.isMini);
   if (towersHere.length > 0) {
     const nonWall = towersHere.find((entry) => entry.type !== "wall");
     sellTower(nonWall || towersHere[0]);
@@ -5845,7 +5929,7 @@ canvas.addEventListener("auxclick", (event) => {
   const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
   const snapped = snapToGrid(x, y);
-  const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20);
+  const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20 && !entry.isMini);
   if (towersHere.length === 0) return;
   const target = towersHere.find((tower) => tower.type !== "wall") || towersHere[0];
   target.disabled = !target.disabled;
