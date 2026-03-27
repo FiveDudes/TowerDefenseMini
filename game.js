@@ -91,6 +91,9 @@ const ui = {
   droneUpgradeActions: document.getElementById("drone-upgrade-actions"),
   dronePath1: document.getElementById("drone-path-1"),
   dronePath2: document.getElementById("drone-path-2"),
+  spikeUpgradeActions: document.getElementById("spike-upgrade-actions"),
+  spikePath1: document.getElementById("spike-path-1"),
+  spikePath2: document.getElementById("spike-path-2"),
   jasperControls: document.getElementById("jasper-controls"),
   towerLevelCap: document.getElementById("tower-level-cap"),
   setWave: document.getElementById("set-wave"),
@@ -137,8 +140,8 @@ const targetingLabels = {
 };
 
 const state = {
-  lives: 20,
-  maxLives: 20,
+  lives: 100,
+  maxLives: 100,
   gold: 80,
   wave: 0,
   totalDamage: 0,
@@ -155,7 +158,7 @@ const state = {
   waveInProgress: false,
   paused: false,
   pauseDrain: 0,
-  lastLives: 20,
+  lastLives: 100,
   damageFlashCooldown: 0,
   damageFlashActive: false,
   nukeUsed: false,
@@ -296,7 +299,7 @@ const towerTypes = {
     damage: 18,
     color: "#fb7185",
     slow: 0,
-    splashRadius: 48,
+    splashRadius: 36,
     projectileSpeed: 300,
   },
   laser: {
@@ -923,6 +926,7 @@ function createEnemy(type, options = {}) {
     ? { x: (Math.random() - 0.5) * 18, y: (Math.random() - 0.5) * 18 }
     : null;
   const isStealth = coalesce(options.stealth, type === "stealth");
+  const baseCastleDamage = type === "swarm" || type === "swarmlet" ? 8 : 5;
   const enemy = {
     x: start.x + (pathOffset ? pathOffset.x : 0),
     y: start.y + (pathOffset ? pathOffset.y : 0),
@@ -954,7 +958,7 @@ function createEnemy(type, options = {}) {
     immuneExplosion: isDiamond,
     explosionVulnerable: type === "swarmlet",
     pathOffset,
-    castleDamage: tierFactor,
+    castleDamage: baseCastleDamage,
   };
   if (enemy.armored) {
     enemy.armorHits = 0;
@@ -983,7 +987,7 @@ function placeTower(type, x, y) {
   const hasWall = state.towers.some((tower) => tower.type === "wall" && tower.x === x && tower.y === y);
   if (isOnPath(x, y) && !data.allowOnPath && !hasWall) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
-  if (type !== "wall" && type !== "op" && type !== "mine" && type !== "floorSpike") {
+  if (type !== "wall" && type !== "op" && type !== "mine" && type !== "floorSpike" && type !== "drone") {
     if (!hasWall) return;
   }
   for (const tower of state.towers) {
@@ -1216,6 +1220,19 @@ function getTowerStats(tower) {
   let dartArmorWeaken = false;
   let globalPoisonDps = 0;
   let globalPoisonDuration = 0;
+  let spikeRange = data.spikeRange;
+  let spikeExtendSpeed = data.spikeExtendSpeed;
+  let spikeRetractSpeed = data.spikeRetractSpeed;
+  let spikeHold = data.spikeHold;
+  let spikeDamage = data.damage;
+  let spikeSlow = 0;
+  let spikeSlowDuration = 1.2;
+  let spikeCount = 1;
+  let spikeDrillCharge = 0;
+  let spikeDrillDps = 0;
+  let spikeWave = false;
+  let spikeWaveRadius = 0;
+  let spikeWaveSlow = 0;
 
   if (tower.type === "watch") {
     if (!projectileSpeed) {
@@ -1496,7 +1513,7 @@ function getTowerStats(tower) {
         }
         if (tier >= 3) {
           projectileSpeed = (projectileSpeed || data.projectileSpeed || 300) * 1.6;
-          data.splashRadius += 12;
+          data.splashRadius += 8;
           rate *= 0.55;
         }
         if (tier >= 4) {
@@ -1508,7 +1525,7 @@ function getTowerStats(tower) {
         if (tier >= 5) {
           bombBurstCount = 12;
           damage *= 1.35;
-          data.splashRadius += 18;
+          data.splashRadius += 12;
           rate = Math.min(rate, 0.25);
           bombProjectileKind = "rocket";
           range += 90;
@@ -1518,7 +1535,7 @@ function getTowerStats(tower) {
           damage *= 1.25;
         }
         if (tier >= 2) {
-          data.splashRadius += 16;
+          data.splashRadius += 10;
         }
         if (tier >= 3) {
           bombClusterCount = 12;
@@ -1539,6 +1556,80 @@ function getTowerStats(tower) {
           bombClusterChildRadius = data.splashRadius * 0.5;
         }
       }
+    }
+    if (tower.type === "spikeTower") {
+      const tier = Math.min(level, 5);
+      const path = tower.upgradePath || 1;
+      spikeDamage = data.damage;
+      spikeRange = data.spikeRange;
+      spikeExtendSpeed = data.spikeExtendSpeed;
+      spikeRetractSpeed = data.spikeRetractSpeed;
+      spikeHold = data.spikeHold;
+      spikeSlow = 0;
+      spikeSlowDuration = 1.2;
+      spikeCount = 1;
+      spikeDrillCharge = 0;
+      spikeDrillDps = 0;
+      spikeWave = false;
+      spikeWaveRadius = 0;
+      spikeWaveSlow = 0;
+      if (path === 1) {
+        if (tier >= 1) {
+          spikeDamage *= 1.35;
+        }
+        if (tier >= 2) {
+          spikeSlow = Math.max(spikeSlow, 0.18);
+          spikeSlowDuration = 1.4;
+        }
+        if (tier >= 3) {
+          spikeDrillCharge = 1.75;
+          spikeDrillDps = spikeDamage * 0.85;
+        }
+        if (tier >= 4) {
+          spikeDamage *= 1.25;
+          spikeDrillCharge = 1.05;
+          spikeDrillDps = Math.max(spikeDrillDps, spikeDamage * 1.1);
+        }
+        if (tier >= 5) {
+          spikeDamage *= 1.6;
+          spikeSlow = Math.max(spikeSlow, 0.3);
+          spikeSlowDuration = 1.6;
+          spikeDrillCharge = 0.65;
+          spikeDrillDps = Math.max(spikeDrillDps, spikeDamage * 1.45);
+        }
+        if (spikeDrillCharge > 0) {
+          spikeHold = Math.max(spikeHold, spikeDrillCharge + 0.4);
+        }
+      } else {
+        if (tier >= 1) {
+          spikeCount = 2;
+        }
+        if (tier >= 2) {
+          spikeExtendSpeed *= 1.25;
+          spikeRetractSpeed *= 1.35;
+          spikeHold *= 0.8;
+        }
+        if (tier >= 3) {
+          spikeCount = 4;
+        }
+        if (tier >= 4) {
+          spikeCount = 6;
+          spikeExtendSpeed *= 1.35;
+          spikeRetractSpeed *= 1.5;
+          spikeDamage *= 1.1;
+        }
+        if (tier >= 5) {
+          spikeCount = 12;
+          spikeWave = true;
+          spikeWaveRadius = 60;
+          spikeWaveSlow = 0.22;
+          spikeDamage *= 1.2;
+          spikeExtendSpeed *= 1.45;
+          spikeRetractSpeed *= 1.6;
+        }
+      }
+      damage = spikeDamage;
+      slow = Math.max(slow, spikeSlow);
     }
     if (tower.type === "dart") {
       const tier = Math.min(level, 5);
@@ -1689,6 +1780,19 @@ function getTowerStats(tower) {
     dartArmorWeaken,
     globalPoisonDps,
     globalPoisonDuration,
+    spikeRange,
+    spikeExtendSpeed,
+    spikeRetractSpeed,
+    spikeHold,
+    spikeDamage,
+    spikeSlow,
+    spikeSlowDuration,
+    spikeCount,
+    spikeDrillCharge,
+    spikeDrillDps,
+    spikeWave,
+    spikeWaveRadius,
+    spikeWaveSlow,
   };
 }
 
@@ -1754,6 +1858,9 @@ function applyPathLock(tower) {
     case "drone":
       buttons.push({ btn: ui.dronePath1, path: 1 }, { btn: ui.dronePath2, path: 2 });
       break;
+    case "spikeTower":
+      buttons.push({ btn: ui.spikePath1, path: 1 }, { btn: ui.spikePath2, path: 2 });
+      break;
     default:
       break;
   }
@@ -1804,6 +1911,7 @@ function updateUpgradePanel() {
     if (ui.laserUpgradeActions) ui.laserUpgradeActions.classList.add("hidden");
     if (ui.flameUpgradeActions) ui.flameUpgradeActions.classList.add("hidden");
     if (ui.droneUpgradeActions) ui.droneUpgradeActions.classList.add("hidden");
+    if (ui.spikeUpgradeActions) ui.spikeUpgradeActions.classList.add("hidden");
     return;
   }
   if (tower.type === "wall") {
@@ -1819,6 +1927,7 @@ function updateUpgradePanel() {
     if (ui.trapUpgradeAction) ui.trapUpgradeAction.classList.add("hidden");
     if (ui.laserUpgradeActions) ui.laserUpgradeActions.classList.add("hidden");
     if (ui.droneUpgradeActions) ui.droneUpgradeActions.classList.add("hidden");
+    if (ui.spikeUpgradeActions) ui.spikeUpgradeActions.classList.add("hidden");
     return;
   }
   if (tower.type === "mine" || tower.type === "floorSpike") {
@@ -1834,6 +1943,7 @@ function updateUpgradePanel() {
     if (ui.trapUpgradeAction) ui.trapUpgradeAction.classList.add("hidden");
     if (ui.laserUpgradeActions) ui.laserUpgradeActions.classList.add("hidden");
     if (ui.droneUpgradeActions) ui.droneUpgradeActions.classList.add("hidden");
+    if (ui.spikeUpgradeActions) ui.spikeUpgradeActions.classList.add("hidden");
     return;
   }
   const stats = getTowerStats(tower);
@@ -2005,6 +2115,38 @@ function updateUpgradePanel() {
       ui.dronePath2.textContent = `Path 2 (${p2Tier}/5): ${nextP2}`;
     }
   }
+  if (tower.type === "spikeTower") {
+    const tier = Math.min(tower.level, 5);
+    const path = tower.upgradePath || 1;
+    const cost = getUpgradeCost(tower);
+    const path1Upgrades = [
+      "Super Drill: Sharper spikes",
+      "Reinforced spikes",
+      "Drill Start",
+      "Drill Speed",
+      "Splitter of Mountains",
+    ];
+    const path2Upgrades = [
+      "More spikes",
+      "Quicker spring",
+      "Quad spikes",
+      "Spikes galore",
+      "Wave of spikes",
+    ];
+    upgradeText = [
+      `Tier ${tier} (Cost ${cost}): ${path === 1 ? path1Upgrades[tier - 1] : path2Upgrades[tier - 1]}`,
+    ][0];
+    if (ui.spikePath1) {
+      const p1Tier = path === 1 ? tier : 0;
+      const nextP1 = path1Upgrades[Math.min(p1Tier, 4)];
+      ui.spikePath1.textContent = `Path 1 (${p1Tier}/5): ${nextP1}`;
+    }
+    if (ui.spikePath2) {
+      const p2Tier = path === 2 ? tier : 0;
+      const nextP2 = path2Upgrades[Math.min(p2Tier, 4)];
+      ui.spikePath2.textContent = `Path 2 (${p2Tier}/5): ${nextP2}`;
+    }
+  }
   if (tower.type === "watch") {
     const tier = Math.min(tower.level, 5);
     const path = tower.upgradePath || 1;
@@ -2117,6 +2259,9 @@ function updateUpgradePanel() {
   if (ui.droneUpgradeActions) {
     ui.droneUpgradeActions.classList.toggle("hidden", tower.type !== "drone");
   }
+  if (ui.spikeUpgradeActions) {
+    ui.spikeUpgradeActions.classList.toggle("hidden", tower.type !== "spikeTower");
+  }
   if (ui.wallUpgradeAction) {
     ui.wallUpgradeAction.classList.add("hidden");
   }
@@ -2207,10 +2352,13 @@ function handleClick(event) {
     return;
   }
   if (state.placing) {
-    placeTower(state.placing, snapped.x, snapped.y);
+    const placingType = state.placing;
+    placeTower(placingType, snapped.x, snapped.y);
     state.selectedTower = null;
     state.selectedTrap = null;
-    state.placing = null;
+    if (placingType !== "wall") {
+      state.placing = null;
+    }
   }
 }
 
@@ -2367,6 +2515,7 @@ function fireProjectile(tower, enemy, stats) {
         accel: stats.bombProjectileKind === "rocket" ? 240 : undefined,
         damage,
         splashRadius: data.splashRadius,
+        ttl: stats.bombProjectileKind === "rocket" ? 5 : undefined,
         sourceType,
         clusterCount: stats.bombClusterCount || 0,
         clusterChildCount: stats.bombClusterChildCount || 0,
@@ -2645,6 +2794,10 @@ function updateProjectiles(dt) {
     }
 
     if (proj.kind === "bomb" || proj.kind === "missile" || proj.kind === "rocket") {
+      if (typeof proj.ttl === "number") {
+        proj.ttl -= dt;
+        if (proj.ttl <= 0) return false;
+      }
       const isMissile = proj.kind === "missile" || proj.kind === "rocket";
       const targetPos = proj.target && proj.target.hp > 0 ? getEnemyPosition(proj.target) : proj.targetPos;
       if (!targetPos) return false;
@@ -3212,8 +3365,8 @@ function selectTarget(tower, stats) {
   return best.enemy;
 }
 
-function updateSpikeTower(tower, dt) {
-  const data = towerTypes.spikeTower;
+function updateSpikeTower(tower, dt, stats) {
+  const data = stats ? stats.data : towerTypes.spikeTower;
   const sides = getWallPathSides(tower.x, tower.y);
   const dir = sides.left
     ? { x: -1, y: 0 }
@@ -3225,12 +3378,31 @@ function updateSpikeTower(tower, dt) {
           ? { x: 0, y: 1 }
           : null;
   if (!dir) return;
-  const maxLen = data.spikeRange || 32;
+  const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
+  const spikeDamage = (stats && stats.spikeDamage) || data.damage || 0;
+  const spikeCount = (stats && stats.spikeCount) || 1;
+  const spikeSlow = (stats && stats.spikeSlow) || 0;
+  const spikeSlowDuration = (stats && stats.spikeSlowDuration) || 1.2;
+  const spikeHold = (stats && stats.spikeHold) || data.spikeHold || 0.6;
+  const extendSpeed = (stats && stats.spikeExtendSpeed) || data.spikeExtendSpeed || 6;
+  const retractSpeed = (stats && stats.spikeRetractSpeed) || data.spikeRetractSpeed || 1.4;
+  const drillCharge = (stats && stats.spikeDrillCharge) || 0;
+  const drillDps = (stats && stats.spikeDrillDps) || 0;
+  const wave = Boolean(stats && stats.spikeWave);
+  const waveRadius = (stats && stats.spikeWaveRadius) || 0;
+  const waveSlow = (stats && stats.spikeWaveSlow) || 0;
   const phase = tower.spikePhase || "idle";
   const progress = tower.spikeProgress || 0;
-  const findTarget = () => {
-    let best = null;
-    let bestDist = Infinity;
+  const applySpikeEffects = (enemy, dmg, slowFactor) => {
+    if (!enemy || enemy.hp <= 0) return;
+    applyDamage(enemy, dmg);
+    if (slowFactor > 0) {
+      enemy.slowTimer = Math.max(enemy.slowTimer || 0, spikeSlowDuration);
+      enemy.slowFactor = Math.max(enemy.slowFactor || 0, slowFactor);
+    }
+  };
+  const findTargets = () => {
+    const hits = [];
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0) continue;
       const dx = enemy.x - tower.x;
@@ -3239,54 +3411,85 @@ function updateSpikeTower(tower, dt) {
       if (forward <= 0 || forward > maxLen) continue;
       const side = Math.abs(dir.x ? dy : dx);
       if (side > 12) continue;
-      if (forward < bestDist) {
-        bestDist = forward;
-        best = enemy;
-      }
+      hits.push({ enemy, dist: forward });
     }
-    return { target: best, dist: bestDist };
+    hits.sort((a, b) => a.dist - b.dist);
+    return hits;
   };
   if (phase === "idle") {
-    const { target } = findTarget();
-    if (target) {
+    const targets = findTargets();
+    if (targets.length > 0) {
       tower.spikePhase = "extend";
       tower.spikeProgress = 0;
       tower.spikeHit = false;
+      tower.spikeDrillTarget = null;
+      tower.spikeDrillTimer = 0;
     }
     return;
   }
   if (phase === "extend") {
-    const next = Math.min(1, progress + dt * (data.spikeExtendSpeed || 6));
+    const next = Math.min(1, progress + dt * extendSpeed);
     tower.spikeProgress = next;
-    const { target, dist } = findTarget();
-    if (target && !tower.spikeHit && next * maxLen >= dist) {
-      applyDamage(target, data.damage);
-      target.stunTimer = Math.max(target.stunTimer || 0, 0.4);
+    const targets = findTargets();
+    const primary = targets.length > 0 ? targets[0] : null;
+    if (primary && !tower.spikeHit && next * maxLen >= primary.dist) {
+      const hitTargets = targets.slice(0, Math.max(1, spikeCount));
+      for (const entry of hitTargets) {
+        applySpikeEffects(entry.enemy, spikeDamage, spikeSlow);
+      }
+      if (wave && waveRadius > 0) {
+        const waveX = tower.x + dir.x * grid.size;
+        const waveY = tower.y + dir.y * grid.size;
+        for (const enemy of state.enemies) {
+          if (enemy.hp <= 0) continue;
+          const dist = Math.hypot(enemy.x - waveX, enemy.y - waveY);
+          if (dist <= waveRadius) {
+            applySpikeEffects(enemy, spikeDamage * 0.85, Math.max(spikeSlow, waveSlow));
+          }
+        }
+      }
       tower.spikeHit = true;
-      tower.spikeHoldTimer = data.spikeHold || 0.6;
+      tower.spikeHoldTimer = spikeHold;
       tower.spikePhase = "hold";
-      tower.spikeProgress = Math.min(1, dist / maxLen);
+      tower.spikeProgress = Math.min(1, primary.dist / maxLen);
+      if (drillDps > 0 && primary) {
+        tower.spikeDrillTarget = primary.enemy;
+        tower.spikeDrillTimer = drillCharge;
+      }
       return;
     }
     if (next >= 1) {
       tower.spikePhase = "hold";
-      tower.spikeHoldTimer = data.spikeHold || 0.6;
+      tower.spikeHoldTimer = spikeHold;
     }
     return;
   }
   if (phase === "hold") {
     tower.spikeHoldTimer = Math.max(0, (tower.spikeHoldTimer || 0) - dt);
+    if (drillDps > 0 && tower.spikeDrillTarget && tower.spikeDrillTarget.hp > 0) {
+      const target = tower.spikeDrillTarget;
+      const dist = Math.hypot(target.x - tower.x, target.y - tower.y);
+      if (dist <= maxLen + 6) {
+        if ((tower.spikeDrillTimer || 0) > 0) {
+          tower.spikeDrillTimer = Math.max(0, (tower.spikeDrillTimer || 0) - dt);
+        } else {
+          applySpikeEffects(target, drillDps * dt, Math.max(spikeSlow, waveSlow));
+        }
+      }
+    }
     if (tower.spikeHoldTimer <= 0) {
       tower.spikePhase = "retract";
     }
     return;
   }
   if (phase === "retract") {
-    const next = Math.max(0, progress - dt * (data.spikeRetractSpeed || 1.4));
+    const next = Math.max(0, progress - dt * retractSpeed);
     tower.spikeProgress = next;
     if (next <= 0) {
       tower.spikePhase = "idle";
       tower.spikeHit = false;
+      tower.spikeDrillTarget = null;
+      tower.spikeDrillTimer = 0;
     }
   }
 }
@@ -3306,7 +3509,7 @@ function updateTowers(dt) {
     if (tower.disabled) continue;
     if (data.isMine || data.isFloorSpike || data.blocksPath) continue;
     if (tower.type === "spikeTower") {
-      updateSpikeTower(tower, dt);
+      updateSpikeTower(tower, dt, stats);
       continue;
     }
     if (tower.type === "trap") {
@@ -3864,7 +4067,7 @@ function spawnSplitEnemy(parent, tier, overrides = {}) {
     immuneExplosion: coalesce(overrides.immuneExplosion, parent.immuneExplosion),
     explosionVulnerable: coalesce(overrides.explosionVulnerable, parent.explosionVulnerable),
     pathOffset: coalesce(overrides.pathOffset, parent.pathOffset),
-    castleDamage: coalesce(overrides.castleDamage, childTierFactor),
+    castleDamage: coalesce(overrides.castleDamage, parent.castleDamage),
   };
   if (child.armored) {
     child.armorHits = 0;
@@ -5541,6 +5744,22 @@ if (ui.dronePath2) {
   });
 }
 
+if (ui.spikePath1) {
+  ui.spikePath1.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!state.selectedTower || state.selectedTower.type !== "spikeTower") return;
+    trySelectPath(state.selectedTower, 1);
+  });
+}
+
+if (ui.spikePath2) {
+  ui.spikePath2.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!state.selectedTower || state.selectedTower.type !== "spikeTower") return;
+    trySelectPath(state.selectedTower, 2);
+  });
+}
+
 if (ui.upgradeTrap) {
   ui.upgradeTrap.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -5825,8 +6044,8 @@ if (ui.jasperModal) {
 }
 
 function resetGame() {
-  state.lives = 20;
-  state.maxLives = 20;
+  state.lives = 100;
+  state.maxLives = 100;
   state.gold = 80;
   state.wave = 0;
   state.totalDamage = 0;
