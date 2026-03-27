@@ -1563,6 +1563,13 @@ function handleClick(event) {
 
   let selected = null;
   const towersHere = state.towers.filter((tower) => Math.hypot(tower.x - snapped.x, tower.y - snapped.y) < 20);
+  if (state.placing) {
+    const hasNonWall = towersHere.some((tower) => tower.type !== "wall");
+    if (!hasNonWall) {
+      placeTower(state.placing, snapped.x, snapped.y);
+      return;
+    }
+  }
   if (towersHere.length > 0) {
     selected = towersHere.find((tower) => tower.type !== "wall") || towersHere[0];
   }
