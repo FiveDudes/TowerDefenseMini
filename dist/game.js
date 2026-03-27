@@ -546,8 +546,9 @@ function flashButton(element) {
   }, 500);
 }
 
-function getWallUpgradeCost() {
-  return 50;
+function getWallUpgradeCost(level = 0) {
+  const base = 50;
+  return Math.round(base * Math.pow(1.7, Math.max(0, level)));
 }
 
 function sellTower(tower) {
@@ -952,6 +953,9 @@ function placeTower(type, x, y) {
     disabled: false,
     targeting: "first",
   };
+  if (type === "wall") {
+    tower.spikeLevel = 0;
+  }
   if (type === "trap") {
     tower.upgradePath = 1;
     tower.trapCooldown = 0;
@@ -1666,16 +1670,18 @@ function updateUpgradePanel() {
   }
   if (tower.type === "wall") {
     const hasNonWall = state.towers.some((entry) => entry !== tower && entry.type !== "wall" && entry.x === tower.x && entry.y === tower.y);
-    const canUpgrade = !tower.spiky && isWallAdjacentToPath(tower.x, tower.y) && !hasNonWall;
-    const cost = getWallUpgradeCost();
-    const reason = tower.spiky
-      ? "This wall is already spiky."
+    const spikeLevel = tower.spikeLevel || 0;
+    const canUpgrade = isWallAdjacentToPath(tower.x, tower.y) && !hasNonWall && spikeLevel < 3;
+    const cost = getWallUpgradeCost(spikeLevel);
+    const reason = spikeLevel >= 3
+      ? "Spikes are already max level."
       : hasNonWall
         ? "Remove the tower on this wall to upgrade it."
         : !isWallAdjacentToPath(tower.x, tower.y)
           ? "Wall must be next to the road to upgrade."
           : "";
-    ui.upgradeDetails.textContent = `Wall\n\n${tower.spiky ? "Spiky wall (cannot hold towers)." : "Plain wall (can hold towers)."}\n\nUpgrade: Spikes.\n\n${canUpgrade ? `Cost ${cost}` : reason}`;
+    const status = spikeLevel > 0 ? `Spiky wall (Level ${spikeLevel}).` : "Plain wall (can hold towers).";
+    ui.upgradeDetails.textContent = `Wall\n\n${status}\n\nUpgrade: Spikes.\n\n${canUpgrade ? `Cost ${cost}` : reason}`;
     if (ui.watchUpgradeActions) ui.watchUpgradeActions.classList.add("hidden");
     if (ui.freezeUpgradeActions) ui.freezeUpgradeActions.classList.add("hidden");
     if (ui.bombUpgradeActions) ui.bombUpgradeActions.classList.add("hidden");
@@ -3199,39 +3205,46 @@ function updateEnemies(dt) {
   state.enemies = state.enemies.filter((enemy) => enemy.hp > 0);
   for (const enemy of state.enemies) {
     let tookSpikeDamage = false;
+    let spikeDamage = 0;
     for (const wall of state.towers) {
       if (!wall.spiky) continue;
       const sides = getWallPathSides(wall.x, wall.y);
-      const spikeLen = grid.size - 12;
-      const spikeHalf = 10;
+      const spikeLevel = wall.spikeLevel || 1;
+      const spikeLen = grid.size - 12 + spikeLevel * 6;
+      const spikeHalf = 10 + spikeLevel * 2;
+      const damagePerSecond = 12 + spikeLevel * 6;
       if (sides.left) {
         const edgeX = wall.x - 16;
         if (enemy.x >= edgeX - spikeLen && enemy.x <= edgeX && Math.abs(enemy.y - wall.y) <= spikeHalf) {
           tookSpikeDamage = true;
+          spikeDamage = Math.max(spikeDamage, damagePerSecond);
         }
       }
       if (sides.right) {
         const edgeX = wall.x + 16;
         if (enemy.x <= edgeX + spikeLen && enemy.x >= edgeX && Math.abs(enemy.y - wall.y) <= spikeHalf) {
           tookSpikeDamage = true;
+          spikeDamage = Math.max(spikeDamage, damagePerSecond);
         }
       }
       if (sides.up) {
         const edgeY = wall.y - 16;
         if (enemy.y >= edgeY - spikeLen && enemy.y <= edgeY && Math.abs(enemy.x - wall.x) <= spikeHalf) {
           tookSpikeDamage = true;
+          spikeDamage = Math.max(spikeDamage, damagePerSecond);
         }
       }
       if (sides.down) {
         const edgeY = wall.y + 16;
         if (enemy.y <= edgeY + spikeLen && enemy.y >= edgeY && Math.abs(enemy.x - wall.x) <= spikeHalf) {
           tookSpikeDamage = true;
+          spikeDamage = Math.max(spikeDamage, damagePerSecond);
         }
       }
       if (tookSpikeDamage) break;
     }
     if (tookSpikeDamage) {
-      applyDamage(enemy, 16 * dt);
+      applyDamage(enemy, spikeDamage * dt);
       if (enemy.hp <= 0) {
         awardGold(15);
         continue;
@@ -3893,8 +3906,9 @@ function drawTowers() {
       ctx.stroke();
       if (tower.spiky) {
         const sides = getWallPathSides(tower.x, tower.y);
-        const spikeLen = grid.size - 12;
-        const spikeHalf = 8;
+        const spikeLevel = tower.spikeLevel || 1;
+        const spikeLen = grid.size - 12 + spikeLevel * 6;
+        const spikeHalf = 8 + spikeLevel * 2;
         ctx.fillStyle = "rgba(248, 113, 113, 0.9)";
         if (sides.left) {
           const edgeX = tower.x - 16;
@@ -5130,26 +5144,27 @@ if (ui.upgradeTrap) {
   });
 }
 
-if (ui.upgradeWall) {
-  ui.upgradeWall.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const tower = state.selectedTower;
-    if (!tower || tower.type !== "wall") return;
-    if (tower.spiky) return;
-    if (!isWallAdjacentToPath(tower.x, tower.y)) return;
-    const hasNonWall = state.towers.some((entry) => entry !== tower && entry.type !== "wall" && entry.x === tower.x && entry.y === tower.y);
-    if (hasNonWall) return;
-    const cost = getWallUpgradeCost();
-    if (!canAfford(cost)) {
-      flashButton(ui.upgradeWall);
-      return;
-    }
-    payCost(cost);
-    tower.spiky = true;
-    updateHud();
-    updateUpgradePanel();
-  });
-}
+  if (ui.upgradeWall) {
+    ui.upgradeWall.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const tower = state.selectedTower;
+      if (!tower || tower.type !== "wall") return;
+      if ((tower.spikeLevel || 0) >= 3) return;
+      if (!isWallAdjacentToPath(tower.x, tower.y)) return;
+      const hasNonWall = state.towers.some((entry) => entry !== tower && entry.type !== "wall" && entry.x === tower.x && entry.y === tower.y);
+      if (hasNonWall) return;
+      const cost = getWallUpgradeCost(tower.spikeLevel || 0);
+      if (!canAfford(cost)) {
+        flashButton(ui.upgradeWall);
+        return;
+      }
+      payCost(cost);
+      tower.spiky = true;
+      tower.spikeLevel = (tower.spikeLevel || 0) + 1;
+      updateHud();
+      updateUpgradePanel();
+    });
+  }
 
 if (ui.targetingMode) {
   ui.targetingMode.addEventListener("click", (event) => {
