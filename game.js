@@ -1702,7 +1702,6 @@ function updateTraps(dt) {
     });
     for (const splash of state.enemies) {
       if (splash.hp <= 0) continue;
-      if (splash.armored) continue;
       const splashDist = Math.hypot(splash.x - trap.x, splash.y - trap.y);
       if (splashDist <= trap.splashRadius) {
         applyDamage(splash, trap.damage);
@@ -1713,6 +1712,18 @@ function updateTraps(dt) {
     }
   };
   for (const trap of state.traps) {
+    if (trap.launch) {
+      trap.launch.t += dt;
+      const p = Math.min(1, trap.launch.t / trap.launch.duration);
+      trap.x = trap.launch.sx + (trap.launch.tx - trap.launch.sx) * p;
+      trap.y = trap.launch.sy + (trap.launch.ty - trap.launch.sy) * p;
+      if (p < 1) {
+        remaining.push(trap);
+        continue;
+      }
+      trap.launch = null;
+      trap.ttl = trap.life;
+    }
     const isSentry = trap.kind === "sentry";
     if (!isSentry) {
       trap.ttl -= dt;
@@ -1938,12 +1949,12 @@ function getTrapSetterStats(tower) {
     if (tier >= 4) {
       trapType = "mine";
       explode = true;
-      trapDamage *= 1.25;
+      trapDamage *= 1.6;
     }
     if (tier >= 5) {
       trapType = "supermine";
       explode = true;
-      trapDamage *= 2.2;
+      trapDamage *= 3.2;
       splashRadius = 90;
       trapLifetime += 125;
     }
@@ -1984,7 +1995,7 @@ function findTrapSpawnPoint(tower, onPath, snap = true) {
 
 function spawnTrapFrom(tower, stats) {
   const onPath = !(stats.trapType === "turret" || stats.trapType === "sentry");
-  const snap = onPath;
+  const snap = onPath && !(stats.trapType === "mine" || stats.trapType === "supermine");
   for (let i = 0; i < stats.spawnCount; i += 1) {
     const point = findTrapSpawnPoint(tower, onPath, snap);
     if (!point) continue;
@@ -2003,9 +2014,10 @@ function spawnTrapFrom(tower, stats) {
     state.traps.push({
       kind: stats.trapType,
       owner: tower,
-      x: point.x,
-      y: point.y,
+      x: tower.x,
+      y: tower.y,
       ttl: stats.trapType === "sentry" ? Infinity : stats.trapLifetime,
+      life: stats.trapType === "sentry" ? Infinity : stats.trapLifetime,
       damage: stats.trapDamage,
       hitRadius: smallFootprint ? 10 : 14,
       slow: stats.slow,
@@ -2018,6 +2030,14 @@ function spawnTrapFrom(tower, stats) {
       dual: stats.dual,
       cooldown: 0,
       createdAt: performance.now(),
+      launch: {
+        sx: tower.x,
+        sy: tower.y,
+        tx: point.x,
+        ty: point.y,
+        t: 0,
+        duration: 0.25,
+      },
     });
   }
 }
