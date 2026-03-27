@@ -3245,6 +3245,10 @@ function updateEnemies(dt) {
     }
     if (tookSpikeDamage) {
       applyDamage(enemy, spikeDamage * dt);
+      if (state.globalPoisonDps > 0 && state.globalPoisonDuration > 0) {
+        enemy.dotTimer = Math.max(enemy.dotTimer || 0, state.globalPoisonDuration);
+        enemy.dotDps = Math.max(enemy.dotDps || 0, state.globalPoisonDps);
+      }
       if (enemy.hp <= 0) {
         awardGold(15);
         continue;
