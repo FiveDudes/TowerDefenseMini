@@ -74,8 +74,9 @@
               <button id="build-flame" class="btn-flame">Flamethrower (90)</button>
               <button id="build-dart" class="btn-dart">Dart Tower (75)</button>
               <button id="build-trap" class="btn-trap">Trap Setter (95)</button>
+              <button id="build-spike" class="btn-bomb">Spike Tower (70)</button>
               <button id="build-mine" class="btn-mine">Mine (15)</button>
-              <button id="build-floor-spike" class="btn-mine">Floor Spikes (10)</button>
+              <button id="build-floor-spike" class="btn-mine">Floor Spikes (50)</button>
               <button id="build-wall" class="btn-wall">Wall (10)</button>
             </div>
             <div class="upgrade-panel" id="upgrade-panel">
@@ -233,7 +234,7 @@
           </div>
           <div class="control-row">
             <label for="tower-level-cap">Tower Level Cap</label>
-            <input id="tower-level-cap" type="number" min="1" value="5" />
+            <input id="tower-level-cap" type="number" min="0" value="5" placeholder="∞" />
           </div>
           <button id="auto-wave">Auto Next Wave: Off</button>
           <div class="control-row">
@@ -244,7 +245,13 @@
               <option value="heavy">Heavy</option>
               <option value="stealth">Stealth</option>
               <option value="labrat">Lab Rat</option>
+              <option value="diamond">Diamond</option>
+              <option value="swarm">Swarm</option>
               <option value="boss">Boss</option>
+              <option value="boss_fast">Fast Boss</option>
+              <option value="boss_pentagon">Pentagon Boss</option>
+              <option value="boss_hexagon">Hexagon Boss</option>
+              <option value="boss_diamond">Diamond Boss</option>
             </select>
             <input id="spawn-enemy-count" class="spawn-count" type="number" min="1" value="1" />
             <button id="spawn-enemy">Spawn</button>
