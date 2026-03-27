@@ -328,7 +328,7 @@ const towerTypes = {
     range: 0,
     rate: 0,
     damage: 20,
-    color: "#fb7185",
+    color: "#f472b6",
     slow: 0,
     spikeRange: 32,
     spikeExtendSpeed: 6,
@@ -1182,6 +1182,7 @@ function getTowerStats(tower) {
   let droneBombRadius = 0;
   let droneBombRate = 0;
   let bombBurstCount = 1;
+  let bombProjectileKind = "bomb";
   let bombClusterCount = 0;
   let bombClusterChildCount = 0;
   let bombClusterDamage = 0;
@@ -1394,12 +1395,12 @@ function getTowerStats(tower) {
           droneMiniCount = 1;
         }
         if (tier >= 4) {
-          droneMiniCount = 2;
           droneGuns = 4;
           rate *= 0.75;
         }
         if (tier >= 5) {
           rate *= 0.65;
+          droneMiniCount = 2;
           droneBombDamage = damage * 2.2;
           droneBombRadius = 60;
           droneBombRate = 2.2;
@@ -1478,12 +1479,14 @@ function getTowerStats(tower) {
         if (tier >= 4) {
           bombBurstCount = 6;
           rate *= 0.4;
+          bombProjectileKind = "rocket";
         }
         if (tier >= 5) {
           bombBurstCount = 12;
           damage *= 1.35;
           data.splashRadius += 18;
-          rate *= 0.3;
+          rate = Math.min(rate, 0.25);
+          bombProjectileKind = "rocket";
         }
       } else {
         if (tier >= 1) {
@@ -1493,7 +1496,7 @@ function getTowerStats(tower) {
           data.splashRadius += 16;
         }
         if (tier >= 3) {
-          bombClusterCount = 8;
+          bombClusterCount = 12;
           bombClusterDamage = damage * 0.6;
           bombClusterRadius = data.splashRadius * 0.55;
         }
@@ -1503,8 +1506,8 @@ function getTowerStats(tower) {
           bombClusterRadius = data.splashRadius * 0.6;
         }
         if (tier >= 5) {
-          bombClusterCount = 8;
-          bombClusterChildCount = 12;
+          bombClusterCount = 12;
+          bombClusterChildCount = 8;
           bombClusterDamage = damage * 0.55;
           bombClusterChildDamage = damage * 0.35;
           bombClusterRadius = data.splashRadius * 0.7;
@@ -1645,6 +1648,7 @@ function getTowerStats(tower) {
     droneBombRadius,
     droneBombRate,
     bombBurstCount,
+    bombProjectileKind,
     bombClusterCount,
     bombClusterChildCount,
     bombClusterDamage,
@@ -2291,38 +2295,13 @@ function fireProjectile(tower, enemy, stats) {
       const oy = tower.y + Math.sin(offsetAngle) * offset;
       fireHoming(ox, oy, damage, bulletSpeed);
     }
-    if (miniCount > 0) {
-      const miniDamage = damage * (stats.droneMiniDamageMult || 0.7);
-      const offsets = getMiniDroneOffsets(tower, miniCount);
-      for (const offset of offsets) {
-        const ox = tower.x + offset.x;
-        const oy = tower.y + offset.y;
-        const mini = {
-          type: "drone",
-          x: ox,
-          y: oy,
-          baseX: ox,
-          baseY: oy,
-          level: Math.max(1, (tower.level || 1) - 1),
-          cooldown: 0,
-          paidCost: 0,
-          disabled: false,
-          targeting: tower.targeting || "first",
-          isMini: true,
-          parentDrone: tower,
-        };
-        const miniStats = getTowerStats(mini);
-        miniStats.damage = Math.max(1, miniDamage);
-        fireProjectile(mini, enemy, miniStats);
-      }
-    }
     if (stats.droneMissiles > 0) {
       const missileSpeed = stats.droneMissileSpeed || 280;
       const missileDamage = stats.droneMissileDamage || damage * 1.1;
       const missileSplash = stats.droneMissileSplash || 30;
       for (let i = 0; i < stats.droneMissiles; i += 1) {
         state.projectiles.push({
-          kind: "missile",
+          kind: "rocket",
           x: tower.x,
           y: tower.y,
           target: enemy,
@@ -2347,7 +2326,7 @@ function fireProjectile(tower, enemy, stats) {
     const burst = Math.max(1, stats.bombBurstCount || 1);
     for (let i = 0; i < burst; i += 1) {
       state.projectiles.push({
-        kind: "bomb",
+        kind: stats.bombProjectileKind || "bomb",
         x: tower.x,
         y: tower.y,
         target: enemy,
@@ -2625,8 +2604,8 @@ function updateProjectiles(dt) {
       return proj.ttl > 0;
     }
 
-    if (proj.kind === "bomb" || proj.kind === "missile") {
-      const isMissile = proj.kind === "missile";
+    if (proj.kind === "bomb" || proj.kind === "missile" || proj.kind === "rocket") {
+      const isMissile = proj.kind === "missile" || proj.kind === "rocket";
       const targetPos = proj.target && proj.target.hp > 0 ? getEnemyPosition(proj.target) : proj.targetPos;
       if (!targetPos) return false;
       if (proj.target && proj.target.hp > 0) {
@@ -2646,6 +2625,9 @@ function updateProjectiles(dt) {
           ttl: 0.35,
           color: isMissile ? "rgba(251, 146, 60, 0.6)" : "rgba(251, 113, 133, 0.6)",
         });
+        if (proj.sourceType === "bomb") {
+          pushShockwave(targetPos.x, targetPos.y, proj.splashRadius, "rgba(248, 113, 113, 0.5)");
+        }
         for (const enemy of state.enemies) {
           if (enemy.hp <= 0) continue;
           if (enemy.armored && proj.sourceType !== "bomb" && !proj.armorPierce) continue;
@@ -3300,6 +3282,38 @@ function updateTowers(dt) {
     tower.cooldown = Math.max(0, tower.cooldown - dt);
     const range = stats.range;
     const target = selectTarget(tower, stats);
+    if (target) {
+      tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
+    }
+    if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0) {
+      tower.miniCooldown = Math.max(0, (tower.miniCooldown || 0) - dt);
+      if (tower.miniCooldown <= 0 && target) {
+        const miniDamage = stats.damage * (stats.droneMiniDamageMult || 0.7);
+        const offsets = getMiniDroneOffsets(tower, stats.droneMiniCount);
+        for (const offset of offsets) {
+          const ox = tower.x + offset.x;
+          const oy = tower.y + offset.y;
+          const mini = {
+            type: "drone",
+            x: ox,
+            y: oy,
+            baseX: ox,
+            baseY: oy,
+            level: Math.max(1, (tower.level || 1) - 1),
+            cooldown: 0,
+            paidCost: 0,
+            disabled: false,
+            targeting: tower.targeting || "first",
+            isMini: true,
+            parentDrone: tower,
+          };
+          const miniStats = getTowerStats(mini);
+          miniStats.damage = Math.max(1, miniDamage);
+          fireProjectile(mini, target, miniStats);
+        }
+        tower.miniCooldown = Math.max(0.2, stats.rate * 0.7);
+      }
+    }
     if (tower.type === "laser" && stats.laserContinuous) {
       if (tower.laserOverheatTimer > 0) {
         tower.laserOverheatTimer = Math.max(0, tower.laserOverheatTimer - dt);
@@ -3711,6 +3725,17 @@ function applyExplosionDamage(enemy, amount) {
   if (enemy.immuneExplosion) return;
   const scaled = enemy.explosionVulnerable ? amount * 2 : amount;
   applyDamage(enemy, scaled);
+}
+
+function pushShockwave(x, y, radius, color = "rgba(248, 113, 113, 0.45)") {
+  state.explosions.push({
+    x,
+    y,
+    radius: radius * 1.15,
+    ttl: 0.45,
+    color,
+    shockwave: true,
+  });
 }
 
 function spawnSplitEnemy(parent, tier, overrides = {}) {
@@ -4229,10 +4254,57 @@ function drawTowers() {
       } else if (tower.type === "freeze") {
         const base = data.color || "#7dd3fc";
         const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
-        ctx.fill();
+    ctx.fillStyle = base;
+    const drawPolygon = (sides, radius, angleOffset = -Math.PI / 2) => {
+      ctx.beginPath();
+      for (let i = 0; i < sides; i += 1) {
+        const angle = angleOffset + (i * Math.PI * 2) / sides;
+        const px = tower.x + Math.cos(angle) * radius;
+        const py = tower.y + Math.sin(angle) * radius;
+        if (i === 0) {
+          ctx.moveTo(px, py);
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    if (tower.type === "watch") {
+      ctx.beginPath();
+      ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (tower.type === "freeze") {
+      drawPolygon(6, 14);
+    } else if (tower.type === "drone") {
+      drawPolygon(4, 14, Math.PI / 4);
+    } else if (tower.type === "bomb") {
+      drawPolygon(4, 14);
+    } else if (tower.type === "laser") {
+      drawPolygon(3, 15);
+    } else if (tower.type === "dart") {
+      drawPolygon(5, 14);
+    } else if (tower.type === "flame") {
+      drawPolygon(8, 14);
+    } else if (tower.type === "trap") {
+      drawPolygon(3, 13);
+    } else if (tower.type === "spikeTower") {
+      drawPolygon(4, 13);
+    } else {
+      ctx.beginPath();
+      ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const barrelAngle = tower.aimAngle ?? tower.facing ?? 0;
+    if (tower.type !== "wall" && tower.type !== "mine" && tower.type !== "floorSpike" && tower.type !== "trap" && tower.type !== "spikeTower") {
+      ctx.save();
+      ctx.translate(tower.x, tower.y);
+      ctx.rotate(barrelAngle);
+      ctx.fillStyle = shadeColor(base, 0.6);
+      ctx.fillRect(6, -3, 12, 6);
+      ctx.restore();
+    }
         ctx.strokeStyle = stroke;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -4691,6 +4763,31 @@ function drawProjectiles() {
       ctx.fill();
       continue;
     }
+    if (proj.kind === "rocket") {
+      const vx = proj.vx || 1;
+      const vy = proj.vy || 0;
+      const angle = Math.atan2(vy, vx);
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.moveTo(10, 0);
+      ctx.lineTo(-6, 5);
+      ctx.lineTo(-8, 0);
+      ctx.lineTo(-6, -5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(251, 191, 36, 0.8)";
+      ctx.beginPath();
+      ctx.moveTo(-8, 0);
+      ctx.lineTo(-12, 3);
+      ctx.lineTo(-12, -3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
     if (proj.kind === "missile") {
       const vx = proj.vx || 1;
       const vy = proj.vy || 0;
@@ -4734,7 +4831,7 @@ function drawExplosions() {
   for (const explosion of state.explosions) {
     const alpha = Math.min(1, explosion.ttl * 3);
     ctx.strokeStyle = explosion.color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = explosion.shockwave ? 6 : 3;
     ctx.globalAlpha = alpha;
     ctx.beginPath();
     ctx.arc(explosion.x, explosion.y, explosion.radius * (1 - explosion.ttl * 0.6), 0, Math.PI * 2);
