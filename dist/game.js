@@ -1370,6 +1370,7 @@ function getTowerStats(tower) {
   let bombClusterRadius = 0;
   let bombClusterChildDamage = 0;
   let bombClusterChildRadius = 0;
+  let splashRadius = data.splashRadius || 0;
   let dartPoisonDps = data.poisonDps || 0;
   let dartPoisonDuration = data.poisonDuration || 0;
   let dartPoisonRadius = 0;
@@ -1665,56 +1666,60 @@ function getTowerStats(tower) {
       const path = tower.upgradePath || 1;
       if (path === 1) {
         if (tier >= 1) {
-          rate *= 0.75;
+          rate *= 0.8;
         }
         if (tier >= 2) {
-          rate *= 0.6;
+          rate *= 0.65;
         }
         if (tier >= 3) {
-          projectileSpeed = (projectileSpeed || data.projectileSpeed || 300) * 1.6;
-          data.splashRadius += 8;
-          rate *= 0.55;
+          projectileSpeed = (projectileSpeed || data.projectileSpeed || 300) * 1.4;
+          bombProjectileKind = "rocket";
+          bombBurstCount = 1;
+          splashRadius += 4;
+          rate *= 0.7;
         }
         if (tier >= 4) {
           bombBurstCount = 6;
-          rate *= 0.4;
+          rate *= 0.55;
           bombProjectileKind = "rocket";
-          range += 60;
+          range += 50;
+          splashRadius += 4;
         }
         if (tier >= 5) {
           bombBurstCount = 12;
-          damage *= 1.35;
-          data.splashRadius += 12;
-          rate = Math.min(rate, 0.25);
+          damage *= 1.25;
+          splashRadius += 6;
+          rate = Math.min(rate, 0.45);
           bombProjectileKind = "rocket";
-          range += 90;
+          range += 70;
         }
       } else {
         if (tier >= 1) {
-          damage *= 1.25;
+          damage *= 1.2;
         }
         if (tier >= 2) {
-          data.splashRadius += 10;
+          splashRadius += 6;
         }
         if (tier >= 3) {
-          bombClusterCount = 12;
+          bombClusterCount = 10;
           bombClusterDamage = damage * 0.6;
-          bombClusterRadius = data.splashRadius * 0.55;
+          bombClusterRadius = splashRadius * 0.5;
         }
         if (tier >= 4) {
           bombClusterCount = 12;
-          bombClusterDamage = damage * 0.75;
-          bombClusterRadius = data.splashRadius * 0.6;
+          bombClusterDamage = damage * 0.7;
+          bombClusterRadius = splashRadius * 0.55;
         }
         if (tier >= 5) {
           bombClusterCount = 12;
-          bombClusterChildCount = 8;
+          bombClusterChildCount = 6;
           bombClusterDamage = damage * 0.55;
           bombClusterChildDamage = damage * 0.35;
-          bombClusterRadius = data.splashRadius * 0.7;
-          bombClusterChildRadius = data.splashRadius * 0.5;
+          bombClusterRadius = splashRadius * 0.6;
+          bombClusterChildRadius = splashRadius * 0.4;
         }
       }
+      splashRadius = Math.min(65, splashRadius);
     }
     if (tower.type === "spikeTower") {
       const tier = Math.min(level, 5);
@@ -1932,6 +1937,7 @@ function getTowerStats(tower) {
     bombClusterRadius,
     bombClusterChildDamage,
     bombClusterChildRadius,
+    splashRadius,
     dartPoisonDps,
     dartPoisonDuration,
     dartPoisonRadius,
@@ -2662,8 +2668,9 @@ function fireProjectile(tower, enemy, stats) {
     poisonDuration = Math.max(poisonDuration, state.globalPoisonDuration);
   }
 
-  if (data.splashRadius) {
+  if (data.splashRadius || stats.splashRadius) {
     const burst = Math.max(1, stats.bombBurstCount || 1);
+    const splash = stats.splashRadius || data.splashRadius || 0;
     for (let i = 0; i < burst; i += 1) {
       state.projectiles.push({
         kind: stats.bombProjectileKind || "bomb",
@@ -2675,7 +2682,7 @@ function fireProjectile(tower, enemy, stats) {
         maxSpeed: stats.bombProjectileKind === "rocket" ? Math.max(320, (stats.projectileSpeed || data.projectileSpeed || 260) * 1.4) : undefined,
         accel: stats.bombProjectileKind === "rocket" ? 240 : undefined,
         damage,
-        splashRadius: data.splashRadius,
+        splashRadius: splash,
         ttl: stats.bombProjectileKind === "rocket" ? 5 : undefined,
         sourceType,
         clusterCount: stats.bombClusterCount || 0,
@@ -4622,19 +4629,139 @@ function shadeColor(hex, factor) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function drawUpgradePips(tower, color) {
+function drawPolygonLocal(sides, radius, angleOffset = -Math.PI / 2) {
+  ctx.beginPath();
+  for (let i = 0; i < sides; i += 1) {
+    const angle = angleOffset + (i * Math.PI * 2) / sides;
+    const px = Math.cos(angle) * radius;
+    const py = Math.sin(angle) * radius;
+    if (i === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  }
+  ctx.closePath();
+}
+
+function drawUpgradeDetails(tower, color) {
   const level = Math.min(tower.level || 1, 5);
   if (level <= 1) return;
-  const radius = 20;
-  for (let i = 0; i < level; i += 1) {
-    const angle = -Math.PI / 2 + (i * Math.PI * 2) / 5;
-    const x = tower.x + Math.cos(angle) * radius;
-    const y = tower.y + Math.sin(angle) * radius;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-    ctx.fill();
+  const path = tower.upgradePath || 1;
+  ctx.save();
+  ctx.translate(tower.x, tower.y);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+
+  if (tower.type === "bomb") {
+    if (path === 1 && level >= 3) {
+      const podCount = level >= 5 ? 6 : level >= 4 ? 4 : 2;
+      const offsets = [];
+      const spacing = 4;
+      for (let i = 0; i < podCount; i += 1) {
+        offsets.push((i - (podCount - 1) / 2) * spacing);
+      }
+      ctx.save();
+      ctx.rotate(coalesce(tower.aimAngle, tower.facing, 0));
+      for (const offset of offsets) {
+        ctx.beginPath();
+        ctx.arc(12, offset, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (path === 2) {
+      const dots = Math.min(6, level + 1);
+      for (let i = 0; i < dots; i += 1) {
+        const angle = (i / dots) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(Math.cos(angle) * 12, Math.sin(angle) * 12, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    return;
   }
+
+  if (tower.type === "watch") {
+    const ticks = level - 1;
+    for (let i = 0; i < ticks; i += 1) {
+      const angle = (i / ticks) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 10, Math.sin(angle) * 10);
+      ctx.lineTo(Math.cos(angle) * 14, Math.sin(angle) * 14);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (tower.type === "laser") {
+    const fins = level >= 4 ? 4 : 2;
+    for (let i = 0; i < fins; i += 1) {
+      const angle = (i / fins) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 8, Math.sin(angle) * 8);
+      ctx.lineTo(Math.cos(angle) * 14, Math.sin(angle) * 14);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (tower.type === "dart") {
+    const darts = Math.min(5, level);
+    for (let i = 0; i < darts; i += 1) {
+      const angle = (i / darts) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 6, Math.sin(angle) * 6);
+      ctx.lineTo(Math.cos(angle) * 12, Math.sin(angle) * 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (tower.type === "flame") {
+    const tongues = Math.min(4, level);
+    for (let i = 0; i < tongues; i += 1) {
+      const angle = (i / tongues) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 8, Math.sin(angle) * 8);
+      ctx.lineTo(Math.cos(angle) * 12, Math.sin(angle) * 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (tower.type === "freeze") {
+    const petals = Math.min(6, level + 1);
+    for (let i = 0; i < petals; i += 1) {
+      const angle = (i / petals) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 6, Math.sin(angle) * 6);
+      ctx.lineTo(Math.cos(angle) * 12, Math.sin(angle) * 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (tower.type === "spikeTower") {
+    const spikes = Math.min(6, level + 1);
+    for (let i = 0; i < spikes; i += 1) {
+      const angle = (i / spikes) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * 10, Math.sin(angle) * 10);
+      ctx.lineTo(Math.cos(angle) * 14, Math.sin(angle) * 14);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  ctx.restore();
 }
 
 function drawMines() {
@@ -4718,6 +4845,7 @@ function drawDroneBody(x, y, scale = 1, color = "#34d399") {
 function drawTowers() {
   for (const tower of state.towers) {
     const data = towerTypes[tower.type];
+    if (!data) continue;
     if (tower.type === "wall") {
       ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
       ctx.fillRect(tower.x - 16, tower.y - 16, 32, 32);
@@ -4732,250 +4860,140 @@ function drawTowers() {
       ctx.moveTo(tower.x - 12, tower.y);
       ctx.lineTo(tower.x + 12, tower.y);
       ctx.stroke();
-    } else if (data.isMine || data.isFloorSpike) {
       continue;
-    } else {
-      if (tower.type === "watch") {
-        const base = data.color || "#f59e0b";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
+    }
+    if (data.isMine || data.isFloorSpike) continue;
+
+    const base = data.color || "#e2e8f0";
+    const stroke = shadeColor(base, 0.55);
+    const aim = coalesce(tower.aimAngle, tower.facing, 0);
+
+    if (tower.type === "drone") {
+      if (Number.isFinite(tower.baseX) && Number.isFinite(tower.baseY)) {
+        ctx.fillStyle = stroke;
         ctx.beginPath();
-        ctx.moveTo(tower.x, tower.y - 14);
-        ctx.lineTo(tower.x + 14, tower.y + 12);
-        ctx.lineTo(tower.x - 14, tower.y + 12);
+        ctx.arc(tower.baseX, tower.baseY, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = shadeColor(base, 0.4);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(tower.baseX, tower.baseY, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = shadeColor(base, 0.7);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(tower.baseX - 6, tower.baseY);
+        ctx.lineTo(tower.baseX + 6, tower.baseY);
+        ctx.stroke();
+      }
+      const miniScale = tower.isMini ? 0.65 : 1;
+      drawDroneBody(tower.x, tower.y, miniScale, base);
+    } else if (tower.type === "spikeTower") {
+      const spikeStroke = shadeColor(base, 0.55);
+      ctx.fillStyle = base;
+      ctx.fillRect(tower.x - 10, tower.y - 10, 20, 20);
+      ctx.strokeStyle = spikeStroke;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
+      const sides = getWallPathSides(tower.x, tower.y);
+      const dir = sides.left
+        ? { x: -1, y: 0 }
+        : sides.right
+          ? { x: 1, y: 0 }
+          : sides.up
+            ? { x: 0, y: -1 }
+            : sides.down
+              ? { x: 0, y: 1 }
+              : null;
+      if (dir) {
+        const progress = tower.spikeProgress || 0;
+        const len = (data.spikeRange || 32) * progress;
+        const tipX = tower.x + dir.x * len;
+        const tipY = tower.y + dir.y * len;
+        ctx.fillStyle = shadeColor(base, 1.1);
+        ctx.beginPath();
+        if (dir.x !== 0) {
+          const half = 6;
+          ctx.moveTo(tower.x + dir.x * 10, tower.y - half);
+          ctx.lineTo(tower.x + dir.x * 10, tower.y + half);
+          ctx.lineTo(tipX, tipY);
+        } else {
+          const half = 6;
+          ctx.moveTo(tower.x - half, tower.y + dir.y * 10);
+          ctx.lineTo(tower.x + half, tower.y + dir.y * 10);
+          ctx.lineTo(tipX, tipY);
+        }
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      } else if (tower.type === "freeze") {
-        const base = data.color || "#7dd3fc";
-        const stroke = shadeColor(base, 0.55);
-    ctx.fillStyle = base;
-    const drawPolygon = (sides, radius, angleOffset = -Math.PI / 2) => {
-      ctx.beginPath();
-      for (let i = 0; i < sides; i += 1) {
-        const angle = angleOffset + (i * Math.PI * 2) / sides;
-        const px = tower.x + Math.cos(angle) * radius;
-        const py = tower.y + Math.sin(angle) * radius;
-        if (i === 0) {
-          ctx.moveTo(px, py);
-        } else {
-          ctx.lineTo(px, py);
-        }
       }
-      ctx.closePath();
-      ctx.fill();
-    };
-    if (tower.type === "watch") {
+    } else if (tower.type === "op") {
+      ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
       ctx.beginPath();
-      ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
+      ctx.arc(tower.x, tower.y, 18, 0, Math.PI * 2);
       ctx.fill();
-    } else if (tower.type === "freeze") {
-      drawPolygon(6, 14);
-    } else if (tower.type === "drone") {
-      drawPolygon(4, 14, Math.PI / 4);
-    } else if (tower.type === "bomb") {
-      drawPolygon(4, 14);
-    } else if (tower.type === "laser") {
-      drawPolygon(3, 15);
-    } else if (tower.type === "dart") {
-      drawPolygon(5, 14);
-    } else if (tower.type === "flame") {
-      drawPolygon(8, 14);
-    } else if (tower.type === "trap") {
-      drawPolygon(3, 13);
-    } else if (tower.type === "spikeTower") {
-      drawPolygon(4, 13);
+      ctx.strokeStyle = "rgba(253, 224, 71, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(tower.x - 14, tower.y);
+      ctx.lineTo(tower.x + 14, tower.y);
+      ctx.moveTo(tower.x, tower.y - 14);
+      ctx.lineTo(tower.x, tower.y + 14);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
+      ctx.beginPath();
+      ctx.arc(tower.x, tower.y, 5, 0, Math.PI * 2);
+      ctx.fill();
     } else {
-      ctx.beginPath();
-      ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const barrelAngle = coalesce(tower.aimAngle, coalesce(tower.facing, 0));
-    if (tower.type !== "wall" && tower.type !== "mine" && tower.type !== "floorSpike" && tower.type !== "trap" && tower.type !== "spikeTower") {
       ctx.save();
       ctx.translate(tower.x, tower.y);
-      ctx.rotate(barrelAngle);
-      ctx.fillStyle = shadeColor(base, 0.6);
-      ctx.fillRect(6, -3, 12, 6);
-      ctx.restore();
-    }
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(tower.x - 8, tower.y);
-        ctx.lineTo(tower.x + 8, tower.y);
-        ctx.moveTo(tower.x, tower.y - 8);
-        ctx.lineTo(tower.x, tower.y + 8);
-        ctx.stroke();
-      } else if (tower.type === "drone") {
-        const base = data.color || "#34d399";
-        const stroke = shadeColor(base, 0.55);
-        if (Number.isFinite(tower.baseX) && Number.isFinite(tower.baseY)) {
-          ctx.fillStyle = stroke;
-          ctx.beginPath();
-          ctx.arc(tower.baseX, tower.baseY, 12, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = shadeColor(base, 0.4);
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(tower.baseX, tower.baseY, 10, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.strokeStyle = shadeColor(base, 0.7);
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(tower.baseX - 6, tower.baseY);
-          ctx.lineTo(tower.baseX + 6, tower.baseY);
-          ctx.stroke();
-        }
-        const miniScale = tower.isMini ? 0.65 : 1;
-        drawDroneBody(tower.x, tower.y, miniScale, base);
-      } else if (tower.type === "spikeTower") {
-        const base = data.color || "#fb7185";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.fillRect(tower.x - 10, tower.y - 10, 20, 20);
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
-        const sides = getWallPathSides(tower.x, tower.y);
-        const dir = sides.left
-          ? { x: -1, y: 0 }
-          : sides.right
-            ? { x: 1, y: 0 }
-            : sides.up
-              ? { x: 0, y: -1 }
-              : sides.down
-                ? { x: 0, y: 1 }
-                : null;
-        if (dir) {
-          const progress = tower.spikeProgress || 0;
-          const len = (data.spikeRange || 32) * progress;
-          const tipX = tower.x + dir.x * len;
-          const tipY = tower.y + dir.y * len;
-          ctx.fillStyle = shadeColor(base, 1.1);
-          ctx.beginPath();
-          if (dir.x !== 0) {
-            const half = 6;
-            ctx.moveTo(tower.x + dir.x * 10, tower.y - half);
-            ctx.lineTo(tower.x + dir.x * 10, tower.y + half);
-            ctx.lineTo(tipX, tipY);
-          } else {
-            const half = 6;
-            ctx.moveTo(tower.x - half, tower.y + dir.y * 10);
-            ctx.lineTo(tower.x + half, tower.y + dir.y * 10);
-            ctx.lineTo(tipX, tipY);
-          }
-          ctx.closePath();
-          ctx.fill();
-        }
+      ctx.rotate(aim);
+      ctx.fillStyle = base;
+      if (tower.type === "watch") {
+        drawPolygonLocal(3, 16);
+      } else if (tower.type === "freeze") {
+        drawPolygonLocal(6, 14);
       } else if (tower.type === "bomb") {
-        const base = data.color || "#fb7185";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i += 1) {
-          const angle = -Math.PI / 2 + (i * Math.PI * 2) / 5;
-          const px = tower.x + Math.cos(angle) * 14;
-          const py = tower.y + Math.sin(angle) * 14;
-          if (i === 0) {
-            ctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
-          }
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        drawPolygonLocal(5, 14);
       } else if (tower.type === "laser") {
-        const base = data.color || "#ef4444";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.fillRect(tower.x - 10, tower.y - 16, 20, 28);
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tower.x - 10, tower.y - 16, 20, 28);
+        ctx.fillRect(-10, -16, 20, 28);
       } else if (tower.type === "dart") {
-        const base = data.color || "#a78bfa";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.beginPath();
-        ctx.moveTo(tower.x, tower.y - 14);
-        ctx.lineTo(tower.x + 12, tower.y);
-        ctx.lineTo(tower.x, tower.y + 14);
-        ctx.lineTo(tower.x - 12, tower.y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        drawPolygonLocal(3, 16);
       } else if (tower.type === "flame") {
-        const base = data.color || "#f97316";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        drawPolygonLocal(6, 12);
       } else if (tower.type === "trap") {
-        const base = data.color || "#f59e0b";
-        const stroke = shadeColor(base, 0.55);
-        ctx.fillStyle = base;
-        ctx.fillRect(tower.x - 12, tower.y - 12, 24, 24);
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tower.x - 12, tower.y - 12, 24, 24);
-      } else if (tower.type === "op") {
-        ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
-        ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 18, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(253, 224, 71, 0.85)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.9)";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(tower.x - 14, tower.y);
-        ctx.lineTo(tower.x + 14, tower.y);
-        ctx.moveTo(tower.x, tower.y - 14);
-        ctx.lineTo(tower.x, tower.y + 14);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
-        ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 5, 0, Math.PI * 2);
-        ctx.fill();
+        drawPolygonLocal(4, 12);
       } else {
-        ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
         ctx.beginPath();
-        ctx.arc(tower.x, tower.y, 16, 0, Math.PI * 2);
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
-        ctx.lineWidth = 2;
+      }
+      if (tower.type !== "laser") {
+        ctx.fill();
+      }
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      if (tower.type === "laser") {
+        ctx.strokeRect(-10, -16, 20, 28);
+      } else {
         ctx.stroke();
       }
+      if (tower.type !== "trap") {
+        ctx.fillStyle = shadeColor(base, 0.6);
+        ctx.fillRect(6, -3, 12, 6);
+      }
+      ctx.restore();
     }
 
     if (!data.blocksPath && !data.isMine && !data.isFloorSpike && tower.type !== "wall" && tower.type !== "op") {
-      const base = data.color || "#e2e8f0";
-      drawUpgradePips(tower, shadeColor(base, 0.75));
+      drawUpgradeDetails(tower, shadeColor(base, 0.75));
     }
 
     if (tower.disabled) {
       ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
       ctx.fillRect(tower.x - 16, tower.y - 16, 32, 32);
-    }
-
-    if (data.moveSpeed) {
     }
 
     if (tower === state.selectedTower) {
