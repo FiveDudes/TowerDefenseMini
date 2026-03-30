@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><body>
+<script src="./app-source.js"></script>
+<script>
+(() => {
+  const lines = (window.__blockDefenceAppSource || '').split(/\r?\n/);
+  let low = 1;
+  let high = lines.length;
+  let firstBad = -1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const snippet = lines.slice(0, mid).join('\n');
+    try {
+      new Function(snippet);
+      low = mid + 1;
+    } catch (error) {
+      firstBad = mid;
+      high = mid - 1;
+    }
+  }
+  document.body.dataset.firstBad = String(firstBad);
+  const start = Math.max(1, firstBad - 5);
+  const end = Math.min(lines.length, firstBad + 5);
+  const pre = document.createElement('pre');
+  pre.textContent = lines.slice(start - 1, end).map((line, idx) => String(start + idx).padStart(5, ' ') + ': ' + line).join('\n');
+  document.body.appendChild(pre);
+})();
+</script>
+</body></html>
+

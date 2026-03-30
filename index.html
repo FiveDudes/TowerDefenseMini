@@ -1,326 +1,352 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tower Defense Mini v1</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div class="app">
-      <div id="title-screen" class="title-screen">
-        <div class="title-card">
-          <h1>Tower Defense Mini v1</h1>
-          <p>Choose your map and difficulty to begin.</p>
-          <div class="map-picker">
-            <div class="map-label">Map Select</div>
-            <div class="map-grid">
-              <button class="map-card active" data-map="rift">
-                <span class="map-name">Void Rift</span>
-                <span class="map-desc">Classic bend.</span>
-              </button>
-              <button class="map-card" data-map="twin">
-                <span class="map-name">Twin Marsh</span>
-                <span class="map-desc">Two portals converge.</span>
-              </button>
-              <button class="map-card" data-map="crystal">
-                <span class="map-name">Crystal Basin</span>
-                <span class="map-desc">Zig-zag corridors.</span>
-              </button>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block Defence</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="overlay active" id="menuOverlay">
+    <div class="overlay-card menu-card">
+      <div class="menu-title" aria-label="Block Defence">
+        <span class="menu-word menu-word-block">BLOCK</span>
+        <span class="menu-side-tile" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></span>
+        <span class="menu-word">DEFENCE</span>
+      </div>
+      <p class="hint menu-subtitle">Choose a difficulty and map. Some maps use extra portals, scenery changes, and obstacles that block tower line of sight.</p>
+      <div class="menu-selectors">
+        <section>
+          <p class="eyebrow">Difficulty</p>
+          <div class="menu-options" id="difficultyOptions">
+            <button class="menu-option" data-difficulty="easy">Easy</button>
+            <button class="menu-option active" data-difficulty="standard">Standard</button>
+            <button class="menu-option" data-difficulty="hard">Hard</button>
+            <button class="menu-option" data-difficulty="brutal">Brutal</button>
+            <button class="menu-option" data-difficulty="sandbox">Sandbox</button>
+          </div>
+        </section>
+        <section>
+          <p class="eyebrow">Map</p>
+          <div class="menu-options menu-options-maps" id="mapOptions">
+            <button class="menu-option active" data-map="meadow">Classic</button>
+            <button class="menu-option" data-map="canyon">Canyon Fork</button>
+            <button class="menu-option" data-map="ruins">Sunken Ruins</button>
+            <button class="menu-option" data-map="mango">Mango Pass</button>
+            <button class="menu-option" data-map="factory">Factory</button>
+            <button class="menu-option" data-map="outpost">Outpost</button>
+            <button class="menu-option" data-map="fortification">Fortification</button>
+            <button class="menu-option" data-map="graveyard">Graveyard</button>
+          </div>
+        </section>
+      </div>
+      <p class="hint" id="menuMapDescription">Classic: single portal, open lanes, light stone cover.</p>
+      <div class="overlay-actions">
+        <button id="startGameButton">Start Game</button>
+        <button id="openAlmanacButton" class="secondary">Almanac</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="pauseOverlay">
+    <div class="overlay-card">
+      <p class="eyebrow">Paused</p>
+      <h2>Game Menu</h2>
+      <div class="overlay-actions">
+        <button id="resumeGameButton">Resume</button>
+        <button id="pauseAlmanacButton" class="secondary">Almanac</button>
+        <button id="quitToMenuButton" class="secondary">Quit To Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="tutorialOverlay">
+    <div class="overlay-card">
+      <p class="eyebrow">Tutorial</p>
+      <h2 id="tutorialOverlayTitle">Welcome</h2>
+      <div class="tutorial-overlay-body" id="tutorialOverlayBody"></div>
+      <div class="overlay-actions">
+        <button id="tutorialOverlayButton">Continue</button>
+        <button id="tutorialDismissButton" class="secondary">Dismiss Tutorial</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay">
+    <div class="overlay-card">
+      <p class="eyebrow">Defeat</p>
+      <h2>Game Over</h2>
+      <p class="hint" id="gameOverSummary">The base fell.</p>
+      <div class="overlay-actions">
+        <button id="restartGameButton">Play Again</button>
+        <button id="gameOverMenuButton" class="secondary">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="almanacOverlay">
+    <div class="overlay-card overlay-wide">
+      <div class="panel-head">
+        <h2 id="almanacTitle">Almanac</h2>
+        <button id="closeAlmanacButton" class="secondary">Close</button>
+      </div>
+      <div class="almanac-tabs" id="almanacTabs">
+        <button class="secondary active" data-almanac-tab="enemies">Enemies</button>
+        <button class="secondary" data-almanac-tab="towers">Towers</button>
+      </div>
+      <div class="almanac-body" id="almanacBody">
+        <div class="almanac-grid" id="almanacGrid"></div>
+        <div class="almanac-detail" id="almanacDetail">
+          <p class="hint">Select a tower entry to inspect base stats and upgrade scaling.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">Block Defence</p>
+      <h1>Rotate tetromino walls and mount towers on top.</h1>
+      <p class="intro">
+        Place connected tetromino pieces, rotate them into the lane, build towers directly on those blocks, and upgrade them to hold the line.
+      </p>
+    </section>
+
+    <section class="workspace">
+      <aside class="controls">
+        <div class="panel" data-panel="tools">
+          <div class="panel-head">
+            <h2>Tools</h2>
+            <button class="panel-toggle secondary" data-toggle-panel="tools">Hide</button>
+          </div>
+          <div class="tool-grid" id="toolGrid">
+            <button class="tool active" data-tool="wall">Block (5)</button>
+            <button class="tool" data-tool="tower">Tower</button>
+            <button class="tool" data-tool="upgrade">Upgrade</button>
+            <button class="tool" data-tool="erase">Erase</button>
+          </div>
+          <div class="actions compact">
+            <button id="rotateButton">Rotate Block</button>
+          </div>
+          <p class="hint">Blocks cost cash, but each wave gives you one free tetromino. Press <strong>R</strong> or use rotate. Towers must be placed on the tetromino blocks.</p>
+          <p class="next-piece" id="nextPieceText">Next block: waiting</p>
+          <p class="hint" id="selectionText">Selected: Tesla</p>
+          <p class="hint" id="upgradeText">Upgrade: max 5</p>
+          <p class="hint" id="statusText">Ready to solve.</p>
+          <p class="hint" id="routeText">Route length: 0</p>
+        </div>
+        <div class="panel sandbox-controls" id="sandboxControls" hidden>
+          <div class="panel-head">
+            <h2>Sandbox</h2>
+          </div>
+          <div class="sandbox-grid compact">
+            <label class="sandbox-field">
+              <span>Wave</span>
+              <input id="sandboxWaveInput" type="number" min="0" step="1" value="0">
+            </label>
+            <button id="sandboxSetWaveButton" class="secondary">Set</button>
+            <label class="sandbox-field sandbox-field-wide">
+              <span>Enemy</span>
+              <select id="sandboxEnemySelect"></select>
+            </label>
+            <label class="sandbox-field" id="sandboxTierField">
+              <span id="sandboxTierLabel">Tier</span>
+              <select id="sandboxTierSelect">
+                <option value="1">Tier 1</option>
+                <option value="2">Tier 2</option>
+                <option value="3">Tier 3</option>
+              </select>
+            </label>
+            <label class="sandbox-field">
+              <span>Count</span>
+              <input id="sandboxSpawnCountInput" type="number" min="1" step="1" value="1">
+            </label>
+            <label class="sandbox-field">
+              <span>Portal</span>
+              <select id="sandboxPortalSelect"></select>
+            </label>
+            <button id="sandboxSpawnButton">Summon</button>
+          </div>
+          <div class="sandbox-toggles compact">
+            <label class="toggle-chip" for="sandboxSpawnHidden">
+              <input type="checkbox" id="sandboxSpawnHidden">
+              <span>Hidden</span>
+            </label>
+            <label class="toggle-chip" for="sandboxSpawnArmored">
+              <input type="checkbox" id="sandboxSpawnArmored">
+              <span>Armoured</span>
+            </label>
+            <label class="toggle-chip" for="sandboxSpawnShielded">
+              <input type="checkbox" id="sandboxSpawnShielded">
+              <span>Shielded</span>
+            </label>
+          </div>
+        </div>
+        <div class="panel" id="tutorialPanel">
+          <div class="panel-head">
+            <h2>Tutorial</h2>
+          </div>
+          <div class="tutorial-copy" id="tutorialList"></div>
+          <p class="hint" id="tutorialHint">Use arrow keys to pan and start shaping the route.</p>
+        </div>
+        <div class="panel-dock" id="sidePanelDock"></div>
+      </aside>
+
+      <section class="board-panel">
+        <div class="board-topbar">
+          <div class="board-left">
+            <p class="board-cash" id="boardCashText">Cash: 20</p>
+            <p class="board-free" id="freeBlockText">Free block: 1</p>
+          </div>
+          <div class="board-hud">
+            <p id="livesText">Lives: 20</p>
+            <p id="waveText">Wave: 0</p>
+            <p id="enemyText">Enemies: 0</p>
+            <button id="pauseButton" class="secondary">Pause</button>
+          </div>
+        </div>
+        <div class="play-area">
+          <div class="board-frame">
+            <canvas id="board" width="936" height="540" aria-label="Tower defense board"></canvas>
+          </div>
+          <div class="panel towers-strip" data-panel="towers">
+            <div class="panel-head">
+              <h2>Towers</h2>
+              <button class="panel-toggle secondary" data-toggle-panel="towers">Hide</button>
             </div>
-          </div>
-          <div class="difficulty-buttons">
-            <button data-difficulty="easy">Easy</button>
-            <button data-difficulty="medium">Medium</button>
-            <button data-difficulty="hard">Hard</button>
-          </div>
-          <div class="difficulty-buttons">
-            <button id="open-tutorial">Tutorial</button>
-          </div>
-        </div>
-      </div>
-      <div id="game-over" class="title-screen hidden">
-        <div class="title-card">
-          <h1>Game Over</h1>
-          <p>Your defenses have fallen.</p>
-          <div class="difficulty-buttons">
-            <button id="restart-game">Restart</button>
-            <button id="main-menu">Main Menu</button>
+            <div class="tower-scroll tower-scroll-column">
+              <div class="tower-grid tower-grid-column" id="towerGrid">
+                <button class="tower-type active" data-tower-type="tesla">Tesla (7)</button>
+        <button class="tower-type" data-tower-type="missile">Missile (9)</button>
+        <button class="tower-type" data-tower-type="trapper">Trap Setter (6)</button>
+        <button class="tower-type" data-tower-type="laser">Laser (10)</button>
+        <button class="tower-type" data-tower-type="shotgun">Shotgun (10)</button>
+        <button class="tower-type" data-tower-type="freezer">Freezer (8)</button>
+        <button class="tower-type" data-tower-type="drone">Drone (8)</button>
+            <button class="tower-type" data-tower-type="dippy">Dippy (100)</button>
+            <button class="tower-type" data-tower-type="support">Support (42)</button>
+            <button class="tower-type" data-tower-type="crossbow">Crossbow (28)</button>
+            <button class="tower-type" data-tower-type="gate">Acid Gate (56)</button>
           </div>
         </div>
-      </div>
-      <div id="sixseven-overlay" class="sixseven-overlay hidden">
-        <img id="sixseven-gif" alt="Six Seven" />
-      </div>
-      <header class="topbar">
-        <div>
-          <h1>Tower Defense Mini v1</h1>
-          <p>Place towers on the void. Enemies reroute around defenses. Don’t let 100 through.</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="start-wave">Start Wave</button>
-          <button id="pause-wave">Pause Wave</button>
-          <div class="wave-controls">
-            <label for="wave-speed" class="inline-label">Wave Speed</label>
-            <select id="wave-speed">
-              <option value="1">1x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2x</option>
-              <option value="3">3x</option>
-            </select>
-            <button id="auto-wave">Auto Next Wave: Off</button>
+        <p class="hint" id="towerDescription">Tesla: chain lightning with fast bursts.</p>
           </div>
         </div>
-        <div class="topbar-secondary">
-          <button id="open-jasper" class="btn-small btn-jasper hidden">Jasper Menu</button>
-          <button id="half-cash" class="btn-small">Half Cash: Off</button>
+        <div class="board-actions">
+          <button id="waveButton">Start Wave</button>
+          <label class="toggle-chip" for="autoWaveToggle">
+            <input type="checkbox" id="autoWaveToggle">
+            <span>Auto Wave</span>
+          </label>
         </div>
-        <div class="hud">
-          <div>Lives: <span id="lives">100</span></div>
-          <div>Gold: <span id="gold">200</span></div>
-          <div>Wave: <span id="wave">0</span></div>
-          <div>Damage: <span id="damage">0</span></div>
-        </div>
-      </header>
-      <main class="play" id="play-area">
-        <div class="game-column">
-          <canvas id="game" width="960" height="540"></canvas>
-          <div class="game-actions">
-            <button id="nuke-button" class="btn-nuke" aria-label="Nuke"></button>
-            <div class="nuke-count" id="nuke-count">Nukes: 0</div>
-          </div>
-        </div>
-        <aside class="panel">
-          <h2>Build</h2>
-          <div class="panel-grid">
-            <div class="build-list">
-              <button id="build-watch" class="btn-watch">Watch Tower (45)</button>
-              <button id="build-freeze" class="btn-freeze">Freeze Tower (80)</button>
-              <button id="build-drone" class="btn-drone">Drone Tower (95)</button>
-              <button id="build-bomb" class="btn-bomb">Bomb Tower (100)</button>
-              <button id="build-laser" class="btn-laser">Laser Tower (160)</button>
-              <button id="build-flame" class="btn-flame">Flamethrower (105)</button>
-              <button id="build-dart" class="btn-dart">Dart Tower (85)</button>
-              <button id="build-trap" class="btn-trap">Trap Setter (110)</button>
-              <button id="build-spike" class="btn-bomb">Spike Tower (85)</button>
-              <button id="build-mine" class="btn-mine">Mine (20)</button>
-              <button id="build-floor-spike" class="btn-mine">Floor Spikes (60)</button>
+        <div class="tower-popup" id="towerPopup" hidden>
+          <div class="panel tower-popup-card">
+            <div class="panel-head">
+              <h2 id="towerPopupTitle">Tower</h2>
+              <button id="closeTowerPopupButton" class="panel-toggle secondary">Close</button>
             </div>
-            <div class="upgrade-panel" id="upgrade-panel">
-              <strong>Upgrade</strong>
-              <div id="upgrade-details">Select a tower to see upgrade info.</div>
-              <div class="control-row upgrade-target-row hidden" id="upgrade-target-row">
-                <label for="upgrade-target">Upgrade By</label>
-                <input id="upgrade-target" type="number" min="1" value="1" />
-              </div>
-              <div class="control-row upgrade-target-row hidden" id="upgrade-target-action">
-                <span></span>
-                <button id="upgrade-to">Upgrade</button>
-              </div>
-              <div class="control-row upgrade-target-row hidden" id="trap-upgrade-action">
-                <span></span>
-                <button id="upgrade-trap">Upgrade Trap</button>
-              </div>
-              <div id="watch-upgrade-actions" class="upgrade-actions hidden">
-                <button id="watch-path-1" class="btn-watch">Path 1 Upgrade</button>
-                <button id="watch-path-2" class="btn-watch">Path 2 Upgrade</button>
-              </div>
-              <div id="freeze-upgrade-actions" class="upgrade-actions hidden">
-                <button id="freeze-path-1" class="btn-freeze">Path 1: Blizzard</button>
-                <button id="freeze-path-2" class="btn-freeze">Path 2: Permafrost</button>
-              </div>
-              <div id="bomb-upgrade-actions" class="upgrade-actions hidden">
-                <button id="bomb-path-1" class="btn-bomb">Path 1: Rocket Pods</button>
-                <button id="bomb-path-2" class="btn-bomb">Path 2: Cluster Shells</button>
-              </div>
-              <div id="dart-upgrade-actions" class="upgrade-actions hidden">
-                <button id="dart-path-1" class="btn-dart">Path 1: Poison Transfer</button>
-                <button id="dart-path-2" class="btn-dart">Path 2: Stronger Concoction</button>
-              </div>
-              <div id="trap-upgrade-actions" class="upgrade-actions hidden">
-                <button id="trap-path-1" class="btn-trap">Path 1: Turret Spawner</button>
-                <button id="trap-path-2" class="btn-trap">Path 2: Mine Layer</button>
-              </div>
-              <div id="laser-upgrade-actions" class="upgrade-actions hidden">
-                <button id="laser-path-1" class="btn-laser">Path 1: Overcharge</button>
-                <button id="laser-path-2" class="btn-laser">Path 2: Focus</button>
-              </div>
-              <div id="flame-upgrade-actions" class="upgrade-actions hidden">
-                <button id="flame-path-1" class="btn-flame">Path 1: Inferno</button>
-                <button id="flame-path-2" class="btn-flame">Path 2: Pyroclast</button>
-              </div>
-              <div id="drone-upgrade-actions" class="upgrade-actions hidden">
-                <button id="drone-path-1" class="btn-drone">Path 1: Missile Drone</button>
-                <button id="drone-path-2" class="btn-drone">Path 2: Drone Commander</button>
-              </div>
-              <div id="spike-upgrade-actions" class="upgrade-actions hidden">
-                <button id="spike-path-1" class="btn-bomb">Path 1: Super Drill</button>
-                <button id="spike-path-2" class="btn-bomb">Path 2: Sea of Spikes</button>
-              </div>
-              <div class="control-row targeting-row hidden" id="targeting-row">
-                <span>Target</span>
-                <button id="targeting-mode" class="btn-small" type="button">Target: First</button>
-              </div>
-            </div>
-          </div>
-          <button id="open-encyclopedia" class="btn-small">Open Encyclopedia</button>
-          <button id="open-tips" class="btn-small">Open Tips</button>
-          <div class="tip hidden">
-            <strong>Enemy Encyclopedia</strong>
-            <div id="encyclopedia">Encounter enemies to learn about them.</div>
-          </div>
-          <div id="jasper-controls" class="tip hidden"></div>
-        </aside>
-      </main>
-      <footer class="footer"></footer>
-    </div>
-    <div id="encyclopedia-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
-      <div class="encyclopedia-card">
-        <div class="encyclopedia-header">
-          <span class="encyclopedia-icon">!</span>
-          <span class="encyclopedia-title">ENEMY ENCYCLOPEDIA</span>
-        </div>
-        <div id="encyclopedia-modal-content" class="encyclopedia-content">
-          Encounter enemies to learn about them.
-        </div>
-        <div class="encyclopedia-actions">
-          <button id="close-encyclopedia" class="btn-secondary" type="button" data-close="encyclopedia">Close</button>
-        </div>
-      </div>
-    </div>
-    <div id="tips-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
-      <div class="encyclopedia-card">
-        <div class="encyclopedia-header">
-          <span class="encyclopedia-icon">?</span>
-          <span class="encyclopedia-title">TACTICAL TIPS</span>
-        </div>
-        <div id="tips-modal-content" class="encyclopedia-content">
-          <div class="tips-list">
-            <p>Click a tower to upgrade (cost 50). Freeze towers reduce enemy speed.</p>
-            <p>Drone towers can be upgraded via their base marker. Laser towers pierce.</p>
-            <p>Press <kbd>Space</kbd> to start or pause a wave.</p>
-            <p>Right-click a tower to sell it for 80% back.</p>
-            <p>The Nuke clears the map and makes the next wave Radioactive, halving enemy health and speed.</p>
-            <p>Use Laser and Bomb towers to shred enemy armour in 2-3 hits, making them vulnerable to rapid-fire towers.</p>
-            <p>Position Laser towers to fire down long straight paths to maximize their infinite beam collateral damage.</p>
-            <p>The Freezer tower's slowing aura is most effective at chokepoints where towers have high AOE damage.</p>
-            <p>The Flamethrower deals damage over time; place it early in the path to weaken enemies for the finish.</p>
+            <p class="hint" id="towerPopupSummary">Tower details</p>
+            <div class="tower-popup-actions" id="towerPopupActions"></div>
           </div>
         </div>
-        <div class="encyclopedia-actions">
-          <button id="close-tips" class="btn-secondary" type="button" data-close="tips">Close</button>
-        </div>
-      </div>
-    </div>
-    <div id="alert-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
-      <div class="encyclopedia-card">
-        <div class="encyclopedia-header">
-          <span class="encyclopedia-icon">!</span>
-          <span class="encyclopedia-title" id="alert-title">WAVE ALERT</span>
-        </div>
-        <div id="alert-content" class="encyclopedia-content"></div>
-        <div class="encyclopedia-actions">
-          <button id="close-alert" class="btn-secondary" type="button">Continue</button>
-        </div>
-      </div>
-    </div>
-    <div id="tutorial-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
-      <div class="encyclopedia-card">
-        <div class="encyclopedia-header">
-          <span class="encyclopedia-icon">?</span>
-          <span class="encyclopedia-title">HOW TO PLAY</span>
-        </div>
-        <div id="tutorial-modal-content" class="encyclopedia-content">
-          <div class="tips-list">
-            <p>Start a wave to spawn enemies. Press <kbd>Space</kbd> to start or pause a wave.</p>
-            <p>Build towers on the void, not on the path. Enemies reroute around defenses.</p>
-            <p>Watch and Laser towers deal direct damage. Freeze slows. Bombs splash. Darts poison. Drones can be upgraded via their base.</p>
-            <p>Flamethrowers burn targets in a cone and leave a DOT after enemies exit range. Trap Setters spawn traps on the path.</p>
-            <p>Upgrade a tower by clicking it, then clicking again. Right-click sells for 80% back.</p>
-            <p>Use the Target button to change tower priority: First, Last, Strongest, or Weakest.</p>
-            <p>The Nuke is a one-time use weapon of last resort that halves tower stats but deals devastating damage to enemies.</p>
-            <p>Lose a life when an enemy reaches your castle. Survive as many waves as you can.</p>
-          </div>
-        </div>
-        <div class="encyclopedia-actions">
-          <button id="close-tutorial" class="btn-secondary" type="button" data-close="tutorial">Close</button>
-        </div>
-      </div>
-    </div>
-    <div id="jasper-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
-      <div class="encyclopedia-card">
-        <div class="encyclopedia-header">
-          <span class="encyclopedia-icon">J</span>
-          <span class="encyclopedia-title">JASPER MENU</span>
-        </div>
-        <div id="jasper-modal-content" class="encyclopedia-content">
-          <div class="control-row">
-            <button id="build-op" class="hidden op-button btn-op">Jasper Tower (0)</button>
-          </div>
-          <div class="control-row">
-            <label for="set-wave">Set Wave</label>
-            <input id="set-wave" type="number" min="1" value="1" />
-            <button id="apply-wave">Apply</button>
-          </div>
-          <div class="control-row">
-            <label for="tower-level-cap">Tower Level Cap</label>
-            <input id="tower-level-cap" type="number" min="0" value="5" placeholder="∞" />
-          </div>
-          <div class="control-row">
-            <label for="spawn-enemy-type">Spawn Enemy</label>
-            <select id="spawn-enemy-type">
-              <option value="grunt">Grunt</option>
-              <option value="speedy">Speedy</option>
-              <option value="heavy">Heavy</option>
-              <option value="stealth">Stealth</option>
-              <option value="labrat">Lab Rat</option>
-              <option value="diamond">Diamond</option>
-              <option value="swarm">Swarm</option>
-              <option value="boss">Boss</option>
-              <option value="boss_fast">Fast Boss</option>
-              <option value="boss_pentagon">Pentagon Boss</option>
-              <option value="boss_hexagon">Hexagon Boss</option>
-              <option value="boss_diamond">Diamond Boss</option>
-            </select>
-            <input id="spawn-enemy-count" class="spawn-count" type="number" min="1" value="1" />
-            <button id="spawn-enemy">Spawn</button>
-          </div>
-          <div class="control-row">
-            <label>
-              <input id="spawn-enemy-radioactive" type="checkbox" />
-              Radioactive
-            </label>
-            <label>
-              <input id="spawn-enemy-armored" type="checkbox" />
-              Armored
-            </label>
-            <label>
-              <input id="spawn-enemy-darkmatter" type="checkbox" />
-              Dark Matter
-            </label>
-            <label>
-              <input id="spawn-enemy-poisoned" type="checkbox" />
-              Poisoned
-            </label>
-            <label>
-              <input id="spawn-enemy-onflame" type="checkbox" />
-              On Fire
-            </label>
-            <label>
-              <input id="spawn-enemy-empty" type="checkbox" class="hidden" />
-              <span class="hidden">Spacer</span>
-            </label>
-          </div>
-        </div>
-        <div class="encyclopedia-actions">
-          <button id="close-jasper" class="btn-secondary" type="button" data-close="jasper">Close</button>
-        </div>
-      </div>
-    </div>
-    <div id="damage-flash"></div>
-    <script src="game.js"></script>
+        <div class="panel-dock panel-dock-board" id="boardPanelDock"></div>
+      </section>
+    </section>
+  </main>
+
+    <script src="./app.js"></script>
+    <script>
+      (() => {
+        const difficultyOptions = document.getElementById("difficultyOptions");
+        const mapOptions = document.getElementById("mapOptions");
+        const startGameButton = document.getElementById("startGameButton");
+        const openAlmanacButton = document.getElementById("openAlmanacButton");
+        const menuMapDescription = document.getElementById("menuMapDescription");
+        const bridge = window.__blockDefenceMenuBridge;
+        const maps = window.__blockDefenceMenuMaps || {};
+        document.body.dataset.menuBridge = bridge ? "ready" : "missing";
+
+        function syncMenuState() {
+          const state = bridge?.getState?.();
+
+          if (!state) {
+            return;
+          }
+
+          difficultyOptions?.querySelectorAll("[data-difficulty]").forEach((button) => {
+            button.classList.toggle("active", button.dataset.difficulty === state.difficulty);
+          });
+
+          mapOptions?.querySelectorAll("[data-map]").forEach((button) => {
+            button.classList.toggle("active", button.dataset.map === state.map);
+          });
+
+          const map = maps[state.map];
+          if (map && menuMapDescription) {
+            menuMapDescription.textContent = `${map.name}: ${map.description}`;
+          }
+        }
+
+        difficultyOptions?.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-difficulty]");
+
+          if (!button) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          if (bridge?.setDifficulty?.(button.dataset.difficulty)) {
+            syncMenuState();
+          }
+        }, true);
+
+        mapOptions?.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-map]");
+
+          if (!button) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          if (bridge?.setMap?.(button.dataset.map)) {
+            syncMenuState();
+          }
+        }, true);
+
+        startGameButton?.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (bridge?.startFromMenu) {
+            bridge.startFromMenu();
+          } else if (menuMapDescription) {
+            const detail = [window.__blockDefenceBootError, window.__blockDefenceCompileError].filter(Boolean).join(" | ");
+            menuMapDescription.textContent = detail
+              ? `Start Game is unavailable. ${detail}`
+              : "Start Game is unavailable because the game script did not finish loading.";
+          }
+        }, true);
+
+        openAlmanacButton?.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (bridge?.openAlmanacFromMenu) {
+            bridge.openAlmanacFromMenu();
+          } else if (menuMapDescription) {
+            const detail = [window.__blockDefenceBootError, window.__blockDefenceCompileError].filter(Boolean).join(" | ");
+            menuMapDescription.textContent = detail
+              ? `Almanac is unavailable. ${detail}`
+              : "Almanac is unavailable because the game script did not finish loading.";
+          }
+        }, true);
+
+        syncMenuState();
+      })();
+    </script>
   </body>
 </html>
+
+
+
+

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><body>
+<script src="./.app-source.js"></script>
+<script>
+try {
+  new Function(window.__appSource || '');
+  document.body.dataset.compile = 'ok';
+} catch (error) {
+  document.body.dataset.compile = error.message;
+}
+</script>
+</body></html>

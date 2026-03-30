@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><body>
+<script src="./app-source.js"></script>
+<script>
+(() => {
+  let out = '';
+  try {
+    new Function(window.__blockDefenceAppSource || '');
+    out = 'ok';
+  } catch (error) {
+    out = JSON.stringify({
+      name: error && error.name,
+      message: error && error.message,
+      stack: error && error.stack,
+      lineNumber: error && error.lineNumber,
+      columnNumber: error && error.columnNumber,
+      fileName: error && error.fileName,
+      toString: error ? String(error) : ''
+    }, null, 2);
+  }
+  const pre = document.createElement('pre');
+  pre.textContent = out;
+  document.body.appendChild(pre);
+})();
+</script>
+</body></html>
