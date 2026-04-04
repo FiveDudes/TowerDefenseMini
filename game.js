@@ -224,6 +224,9 @@ const state = {
   halfCash: false,
 };
 
+window.state = state;
+window.getState = () => state;
+
 const maps = [
   {
     id: "rift",
