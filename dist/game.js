@@ -3587,9 +3587,21 @@ function selectTarget(tower, stats) {
 
 function updateSpikeTower(tower, dt, stats) {
   const data = stats ? stats.data : towerTypes.spikeTower;
-  const dir = getSpikeDirection(tower);
-  if (!dir) return;
   const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
+  const pickSpikeTarget = () => {
+    let best = null;
+    for (const enemy of state.enemies) {
+      if (enemy.hp <= 0) continue;
+      if (enemy.stealth && !enemy.revealed && tower.type !== "watch" && tower.type !== "op" && !state.revealStealth && !stats?.canHitStealth) continue;
+      const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+      if (dist > maxLen) continue;
+      if (!best || dist < best.dist) {
+        best = { enemy, dist };
+      }
+    }
+    return best ? best.enemy : null;
+  };
+  let dir = tower.spikeDir || getSpikeDirection(tower);
   const spikeDamage = (stats && stats.spikeDamage) || data.damage || 0;
   const spikeCount = (stats && stats.spikeCount) || 1;
   const spikeSlow = (stats && stats.spikeSlow) || 0;
@@ -3604,9 +3616,12 @@ function updateSpikeTower(tower, dt, stats) {
   const waveSlow = (stats && stats.spikeWaveSlow) || 0;
   const phase = tower.spikePhase || "idle";
   const progress = tower.spikeProgress || 0;
-  const applySpikeEffects = (enemy, dmg, slowFactor) => {
+  const applySpikeEffects = (enemy, dmg, slowFactor, stunDuration) => {
     if (!enemy || enemy.hp <= 0) return;
     applyDamage(enemy, dmg);
+    if (stunDuration && stunDuration > 0) {
+      enemy.stunTimer = Math.max(enemy.stunTimer || 0, stunDuration);
+    }
     if (slowFactor > 0) {
       enemy.slowTimer = Math.max(enemy.slowTimer || 0, spikeSlowDuration);
       enemy.slowFactor = Math.max(enemy.slowFactor || 0, slowFactor);
@@ -3628,16 +3643,20 @@ function updateSpikeTower(tower, dt, stats) {
     return hits;
   };
   if (phase === "idle") {
-    const targets = findTargets();
-    if (targets.length > 0) {
-      tower.spikePhase = "extend";
-      tower.spikeProgress = 0;
-      tower.spikeHit = false;
-      tower.spikeDrillTarget = null;
-      tower.spikeDrillTimer = 0;
-    }
+    const target = pickSpikeTarget();
+    if (!target) return;
+    const dx = target.x - tower.x;
+    const dy = target.y - tower.y;
+    dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+    tower.spikePhase = "extend";
+    tower.spikeProgress = 0;
+    tower.spikeHit = false;
+    tower.spikeDrillTarget = null;
+    tower.spikeDrillTimer = 0;
+    tower.spikeDir = dir;
     return;
   }
+  if (!dir) return;
   if (phase === "extend") {
     const next = Math.min(1, progress + dt * extendSpeed);
     tower.spikeProgress = next;
@@ -3645,8 +3664,10 @@ function updateSpikeTower(tower, dt, stats) {
     const primary = targets.length > 0 ? targets[0] : null;
     if (primary && !tower.spikeHit && next * maxLen >= primary.dist) {
       const hitTargets = targets.slice(0, Math.max(1, spikeCount));
+      const hitProgress = Math.min(1, primary.dist / maxLen);
+      const stunDuration = spikeHold + hitProgress / Math.max(0.01, retractSpeed);
       for (const entry of hitTargets) {
-        applySpikeEffects(entry.enemy, spikeDamage, spikeSlow);
+        applySpikeEffects(entry.enemy, spikeDamage, spikeSlow, stunDuration);
       }
       if (wave && waveRadius > 0) {
         const waveX = tower.x + dir.x * grid.size;
@@ -3655,14 +3676,14 @@ function updateSpikeTower(tower, dt, stats) {
           if (enemy.hp <= 0) continue;
           const dist = Math.hypot(enemy.x - waveX, enemy.y - waveY);
           if (dist <= waveRadius) {
-            applySpikeEffects(enemy, spikeDamage * 0.85, Math.max(spikeSlow, waveSlow));
+            applySpikeEffects(enemy, spikeDamage * 0.85, Math.max(spikeSlow, waveSlow), 0);
           }
         }
       }
       tower.spikeHit = true;
       tower.spikeHoldTimer = spikeHold;
       tower.spikePhase = "hold";
-      tower.spikeProgress = Math.min(1, primary.dist / maxLen);
+      tower.spikeProgress = hitProgress;
       if (drillDps > 0 && primary) {
         tower.spikeDrillTarget = primary.enemy;
         tower.spikeDrillTimer = drillCharge;
@@ -3701,6 +3722,7 @@ function updateSpikeTower(tower, dt, stats) {
       tower.spikeHit = false;
       tower.spikeDrillTarget = null;
       tower.spikeDrillTimer = 0;
+      tower.spikeDir = null;
     }
   }
 }
@@ -4924,7 +4946,7 @@ function drawTowers() {
       ctx.strokeStyle = spikeStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
-      const dir = getSpikeDirection(tower);
+      const dir = tower.spikeDir || getSpikeDirection(tower);
       if (dir) {
         const progress = tower.spikeProgress || 0;
         const len = (data.spikeRange || 32) * progress;
