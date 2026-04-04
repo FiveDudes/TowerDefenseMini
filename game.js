@@ -226,6 +226,35 @@ const state = {
 
 window.state = state;
 window.getState = () => state;
+window.debugState = () => ({
+  towers: state.towers.map((tower) => ({
+    type: tower.type,
+    x: Math.round(tower.x),
+    y: Math.round(tower.y),
+    level: tower.level,
+    cooldown: tower.cooldown,
+    disabled: tower.disabled,
+  })),
+  enemies: state.enemies.map((enemy) => ({
+    type: enemy.type,
+    x: Math.round(enemy.x),
+    y: Math.round(enemy.y),
+    hp: Math.round(enemy.hp),
+    armored: enemy.armored,
+    stealth: enemy.stealth,
+  })),
+  projectiles: state.projectiles.length,
+});
+window.debugTargets = () =>
+  state.towers.map((tower) => {
+    const stats = getTowerStats(tower);
+    const target = stats ? selectTarget(tower, stats) : null;
+    return {
+      type: tower.type,
+      range: stats ? Math.round(stats.range) : 0,
+      target: target ? { type: target.type, x: Math.round(target.x), y: Math.round(target.y) } : null,
+    };
+  });
 
 const maps = [
   {
