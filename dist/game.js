@@ -3790,7 +3790,10 @@ function updateTowers(dt) {
     }
     tower.cooldown = Math.max(0, tower.cooldown - dt);
     const range = stats.range;
-    const target = selectTarget(tower, stats);
+    let target = selectTarget(tower, stats);
+    if (!target) {
+      target = getClosestEnemyTarget(tower.x, tower.y);
+    }
     if (target) {
       tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
     }
@@ -5604,7 +5607,7 @@ function drawPlacementPreview() {
   const snapped = snapToGrid(x, y);
   const data = towerTypes[state.placing];
   if (!data) return;
-  const invalidPath = isOnPath(snapped.x, snapped.y) && !data.allowOnPath;
+  const invalidPath = isOnPath(snapped.x, snapped.y) && !data.allowOnPath && !data.blocksPath;
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
   const invalid = invalidPath || invalidMine;
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
