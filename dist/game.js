@@ -819,6 +819,44 @@ function upgradeTrap(trap) {
   return;
 }
 
+function getNearestPathPoint(x, y) {
+  const paths = getActivePaths();
+  let best = null;
+  let bestDist = Infinity;
+  for (const points of paths) {
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const abx = b.x - a.x;
+      const aby = b.y - a.y;
+      const denom = abx * abx + aby * aby;
+      if (denom === 0) continue;
+      const t = ((x - a.x) * abx + (y - a.y) * aby) / denom;
+      const clamped = Math.max(0, Math.min(1, t));
+      const px = a.x + abx * clamped;
+      const py = a.y + aby * clamped;
+      const dist = Math.hypot(x - px, y - py);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { x: px, y: py };
+      }
+    }
+  }
+  return best ? { point: best, dist: bestDist } : null;
+}
+
+function getSpikeDirection(tower) {
+  const nearest = getNearestPathPoint(tower.x, tower.y);
+  if (!nearest) return null;
+  const dx = nearest.point.x - tower.x;
+  const dy = nearest.point.y - tower.y;
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return null;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: Math.sign(dx), y: 0 };
+  }
+  return { x: 0, y: Math.sign(dy) };
+}
+
 function updateEncyclopedia() {
   if (!ui.encyclopedia) return;
   const enemyEntries = [
@@ -1982,7 +2020,7 @@ function getTowerDescription(type) {
     case "trap":
       return "Spawns traps that decay over time.";
     case "spikeTower":
-      return "Wall-mounted spikes that jab enemies on the path.";
+      return "Void-mounted spikes that jab toward the nearest path.";
     case "mine":
       return "Explodes when enemies walk over it.";
     case "floorSpike":
@@ -3549,16 +3587,7 @@ function selectTarget(tower, stats) {
 
 function updateSpikeTower(tower, dt, stats) {
   const data = stats ? stats.data : towerTypes.spikeTower;
-  const sides = getWallPathSides(tower.x, tower.y);
-  const dir = sides.left
-    ? { x: -1, y: 0 }
-    : sides.right
-      ? { x: 1, y: 0 }
-      : sides.up
-        ? { x: 0, y: -1 }
-        : sides.down
-          ? { x: 0, y: 1 }
-          : null;
+  const dir = getSpikeDirection(tower);
   if (!dir) return;
   const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
   const spikeDamage = (stats && stats.spikeDamage) || data.damage || 0;
@@ -4895,16 +4924,7 @@ function drawTowers() {
       ctx.strokeStyle = spikeStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
-      const sides = getWallPathSides(tower.x, tower.y);
-      const dir = sides.left
-        ? { x: -1, y: 0 }
-        : sides.right
-          ? { x: 1, y: 0 }
-          : sides.up
-            ? { x: 0, y: -1 }
-            : sides.down
-              ? { x: 0, y: 1 }
-              : null;
+      const dir = getSpikeDirection(tower);
       if (dir) {
         const progress = tower.spikeProgress || 0;
         const len = (data.spikeRange || 32) * progress;
