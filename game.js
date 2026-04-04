@@ -22,6 +22,7 @@ const ui = {
   gold: document.getElementById("gold"),
   wave: document.getElementById("wave"),
   damage: document.getElementById("damage"),
+  mapName: document.getElementById("map-name"),
   encyclopedia: document.getElementById("encyclopedia"),
   encyclopediaModal: document.getElementById("encyclopedia-modal"),
   encyclopediaModalContent: document.getElementById("encyclopedia-modal-content"),
@@ -725,6 +726,10 @@ function updateHud() {
   ui.lives.textContent = state.lives;
   ui.gold.textContent = state.infiniteGold ? "∞" : Math.round(state.gold);
   ui.wave.textContent = state.wave;
+  if (ui.mapName) {
+    const map = getActiveMap();
+    ui.mapName.textContent = map ? `Map: ${map.name}` : "Map: --";
+  }
   if (ui.damage) {
     ui.damage.textContent = Math.round(state.totalDamage || 0);
   }
@@ -1245,7 +1250,7 @@ function placeTower(type, x, y) {
   if (!state.gameStarted) return;
   if (!data) return;
   if (type === "op" && state.opPlaced) return;
-  if (isOnPath(x, y) && !data.allowOnPath) return;
+  if (isOnPath(x, y) && !data.allowOnPath && !data.blocksPath) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
   if (type === "drone" && isOnPath(x, y)) return;
   for (const tower of state.towers) {
@@ -4411,6 +4416,10 @@ function getClosestEnemyTarget(fromX, fromY) {
   let bestDist = Infinity;
   for (const enemy of state.enemies) {
     if (enemy.hp <= 0) continue;
+    if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+      ensureEnemyPath(enemy);
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+    }
     const dx = enemy.x - fromX;
     const dy = enemy.y - fromY;
     const dist = dx * dx + dy * dy;
@@ -4422,9 +4431,51 @@ function getClosestEnemyTarget(fromX, fromY) {
   return best;
 }
 
+function predictEnemyPosition(enemy, travelTime) {
+  if (!enemy) return null;
+  ensureEnemyPath(enemy);
+  if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) return null;
+  const pathPoints = enemy.path && enemy.path.length > 0 ? enemy.path : (getActivePaths()[0] || []);
+  if (!pathPoints || pathPoints.length < 2) return { x: enemy.x, y: enemy.y };
+  const slowFactor = enemy.slowTimer > 0 ? enemy.slowFactor || 0 : 0;
+  const speed = enemy.speed * (1 - slowFactor);
+  if (!Number.isFinite(speed) || speed <= 0) return { x: enemy.x, y: enemy.y };
+  let remaining = speed * travelTime;
+  let idx = Math.max(0, enemy.pathIndex || 0);
+  let cx = enemy.x;
+  let cy = enemy.y;
+  while (remaining > 0 && idx < pathPoints.length - 1) {
+    const next = pathPoints[idx + 1];
+    const dx = next.x - cx;
+    const dy = next.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 0.001) {
+      idx += 1;
+      cx = next.x;
+      cy = next.y;
+      continue;
+    }
+    if (remaining >= dist) {
+      remaining -= dist;
+      idx += 1;
+      cx = next.x;
+      cy = next.y;
+      continue;
+    }
+    const t = remaining / dist;
+    cx += dx * t;
+    cy += dy * t;
+    remaining = 0;
+    break;
+  }
+  return { x: cx, y: cy };
+}
+
 function launchNukeFrom(x, y) {
   const closest = getClosestEnemyTarget(x, y);
-  const target = closest ? { x: closest.x, y: closest.y } : { x: canvas.width / 2, y: canvas.height / 2 };
+  const flightDuration = 3.4;
+  const predicted = closest ? predictEnemyPosition(closest, flightDuration) : null;
+  const target = predicted || (closest ? { x: closest.x, y: closest.y } : { x: canvas.width / 2, y: canvas.height / 2 });
   const start = { x, y };
   const apexHeight = Math.min(start.y, target.y) - 260;
   const control = {
@@ -4436,7 +4487,7 @@ function launchNukeFrom(x, y) {
     control,
     end: target,
     age: 0,
-    duration: 3.4,
+    duration: flightDuration,
     detonated: false,
   });
 }
@@ -4535,12 +4586,25 @@ function drawPath() {
   function lerpColor(from, to, t) {
     return `rgb(${lerp(from[0], to[0], t)}, ${lerp(from[1], to[1], t)}, ${lerp(from[2], to[2], t)})`;
   }
+  const outerColor = lerpColor([8, 16, 32], [40, 8, 56], lossRatio);
+  const midColor = lerpColor([9, 20, 36], [54, 9, 80], lossRatio);
+  const innerColor = lerpColor([24, 74, 110], [120, 40, 150], lossRatio);
+  const junctions = new Map();
+  for (const points of paths) {
+    if (!points || points.length === 0) continue;
+    for (const point of points) {
+      const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
+      const entry = junctions.get(key) || { x: point.x, y: point.y, count: 0 };
+      entry.count += 1;
+      junctions.set(key, entry);
+    }
+  }
   for (const points of paths) {
     if (!points || points.length < 2) continue;
     ctx.save();
     ctx.lineCap = "round";
 
-    ctx.strokeStyle = lerpColor([8, 16, 32], [40, 8, 56], lossRatio);
+    ctx.strokeStyle = outerColor;
     ctx.lineWidth = 40;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -4549,7 +4613,7 @@ function drawPath() {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = lerpColor([9, 20, 36], [54, 9, 80], lossRatio);
+    ctx.strokeStyle = midColor;
     ctx.lineWidth = 24;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -4558,7 +4622,7 @@ function drawPath() {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = lerpColor([24, 74, 110], [120, 40, 150], lossRatio);
+    ctx.strokeStyle = innerColor;
     ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -4567,6 +4631,23 @@ function drawPath() {
     }
     ctx.stroke();
 
+    ctx.restore();
+  }
+  for (const entry of junctions.values()) {
+    if (entry.count < 2) continue;
+    ctx.save();
+    ctx.fillStyle = outerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = midColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = innerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 4, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 }
@@ -6271,6 +6352,7 @@ const selectMap = (mapId) => {
     button.classList.toggle("active", button.dataset.map === mapId);
   });
   recomputeGlobalPath();
+  updateHud();
 };
 
 const selectDifficulty = (difficulty) => {
