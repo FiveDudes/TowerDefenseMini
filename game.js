@@ -903,6 +903,38 @@ function upgradeTrap(trap) {
   return;
 }
 
+function getNearestPathPointFromPaths(x, y, paths) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const points of paths) {
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const abx = b.x - a.x;
+      const aby = b.y - a.y;
+      const denom = abx * abx + aby * aby;
+      if (denom === 0) continue;
+      const t = ((x - a.x) * abx + (y - a.y) * aby) / denom;
+      const clamped = Math.max(0, Math.min(1, t));
+      const px = a.x + abx * clamped;
+      const py = a.y + aby * clamped;
+      const dist = Math.hypot(x - px, y - py);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { x: px, y: py };
+      }
+    }
+  }
+  return best ? { point: best, dist: bestDist } : null;
+}
+
+function isAdjacentToPath(x, y, paths = getActivePaths()) {
+  const nearest = getNearestPathPointFromPaths(x, y, paths);
+  if (!nearest) return false;
+  const target = grid.size;
+  return Math.abs(nearest.dist - target) <= 4;
+}
+
 function getNearestPathPoint(x, y) {
   const paths = getActivePaths();
   let best = null;
@@ -1354,6 +1386,7 @@ function placeTower(type, x, y) {
   if (!state.gameStarted) return;
   if (!data) return;
   if (type === "op" && state.opPlaced) return;
+  if (type === "spikeTower" && !isAdjacentToPath(x, y)) return;
   if (isOnPath(x, y) && !data.allowOnPath && !data.blocksPath) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
   if (type === "drone" && isOnPath(x, y)) return;
@@ -1368,6 +1401,9 @@ function placeTower(type, x, y) {
     return;
   }
   if (data.blocksPath) {
+    const prevPaths = state.pathPoints.length > 0
+      ? state.pathPoints.map((path) => path.map((point) => ({ x: point.x, y: point.y })))
+      : [];
     const cell = worldToCell(x, y);
     const endCell = state.mapEndCell;
     const startCells = state.mapStartCells.length > 0 ? state.mapStartCells : [];
@@ -1377,6 +1413,15 @@ function placeTower(type, x, y) {
       return;
     }
     if (!recomputeGlobalPath(cell)) return;
+    for (const tower of state.towers) {
+      if (tower.type !== "spikeTower") continue;
+      if (!isAdjacentToPath(tower.x, tower.y)) {
+        state.pathPoints = prevPaths;
+        updateEnemyPaths();
+        cleanupOffPathFloorSpikes();
+        return;
+      }
+    }
   }
   const cost = data.cost;
   if (!canAfford(cost)) {
@@ -3933,11 +3978,36 @@ function updateSpikeTower(tower, dt, stats) {
     return hits;
   };
   if (phase === "idle") {
-    const target = pickSpikeTarget();
-    if (!target) return;
-    const dx = target.x - tower.x;
-    const dy = target.y - tower.y;
-    dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+    let target = pickSpikeTarget();
+    if (!target && dir) {
+      const targets = findTargets();
+      if (targets.length > 0) {
+        target = targets[0].enemy;
+      }
+    }
+    if (!target) {
+      let nearest = null;
+      for (const enemy of state.enemies) {
+        if (enemy.hp <= 0) continue;
+        if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+          ensureEnemyPath(enemy);
+        }
+        if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+        const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+        if (!nearest || dist < nearest.dist) {
+          nearest = { enemy, dist };
+        }
+      }
+      if (!nearest || nearest.dist > maxLen) return;
+      const dx = nearest.enemy.x - tower.x;
+      const dy = nearest.enemy.y - tower.y;
+      dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+      target = nearest.enemy;
+    } else {
+      const dx = target.x - tower.x;
+      const dy = target.y - tower.y;
+      dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+    }
     tower.spikePhase = "extend";
     tower.spikeProgress = 0;
     tower.spikeHit = false;
@@ -4932,17 +5002,7 @@ function drawPath() {
 
     ctx.restore();
   }
-  for (const entry of junctions.values()) {
-    if (entry.count < 2) continue;
-    ctx.save();
-    ctx.fillStyle = outerColor;
-    ctx.fillRect(entry.x - 20, entry.y - 20, 40, 40);
-    ctx.fillStyle = midColor;
-    ctx.fillRect(entry.x - 12, entry.y - 12, 24, 24);
-    ctx.fillStyle = innerColor;
-    ctx.fillRect(entry.x - 4, entry.y - 4, 8, 8);
-    ctx.restore();
-  }
+  void junctions;
 }
 
 function drawPortalAt(origin, t) {
@@ -5901,9 +5961,10 @@ function drawPlacementPreview() {
   const data = towerTypes[state.placing];
   if (!data) return;
   const invalidPath = isOnPath(snapped.x, snapped.y) && !data.allowOnPath && !data.blocksPath;
+  const invalidSpike = state.placing === "spikeTower" && !isAdjacentToPath(snapped.x, snapped.y);
   const invalidWave = Boolean(data.blocksPath && state.waveInProgress && isOnPath(snapped.x, snapped.y));
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
-  const invalid = invalidPath || invalidMine || invalidWave;
+  const invalid = invalidPath || invalidMine || invalidWave || invalidSpike;
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
   ctx.lineWidth = 2;
   ctx.beginPath();
