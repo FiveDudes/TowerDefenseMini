@@ -1943,8 +1943,9 @@ function getTowerStats(tower) {
     if (tower.type === "spikeTower") {
       const tier = Math.min(level, 5);
       const path = tower.upgradePath || 1;
+      const nearest = getNearestPathPoint(tower.x, tower.y);
       spikeDamage = data.damage;
-      spikeRange = data.spikeRange;
+      spikeRange = nearest ? nearest.dist + 160 : data.spikeRange;
       spikeExtendSpeed = data.spikeExtendSpeed;
       spikeRetractSpeed = data.spikeRetractSpeed;
       spikeHold = data.spikeHold;
@@ -6150,7 +6151,7 @@ function update(dt) {
       if (tower.spikePhase === "extend" && (tower.spikeProgress || 0) <= 0) {
         const stats = getTowerStats(tower);
         const extendSpeed = (stats && stats.spikeExtendSpeed) || towerTypes.spikeTower.spikeExtendSpeed || 6;
-        tower.spikeProgress = Math.min(1, (tower.spikeProgress || 0) + extendSpeed * simDt * 0.2);
+        tower.spikeProgress = Math.min(1, (tower.spikeProgress || 0) + extendSpeed * simDt * 0.45);
       }
     }
   }
