@@ -6320,7 +6320,7 @@ function update(dt) {
   updateTrapSetters(simDt);
   updateTraps(simDt);
   updateTowers(simDt);
-  if (state.waveInProgress && state.enemies.length > 0) {
+  if (state.enemies.length > 0) {
     for (const tower of state.towers) {
       const stats = getTowerStats(tower);
       if (!stats) continue;
