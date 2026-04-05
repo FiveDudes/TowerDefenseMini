@@ -3920,6 +3920,20 @@ function updateTrapSetters(dt) {
   }
 }
 
+function forceSpikeExtend(tower) {
+  if (!tower || tower.type !== "spikeTower") return;
+  if (tower.spikePhase && tower.spikePhase !== "idle") return;
+  if (state.enemies.length === 0) return;
+  const dir = tower.spikeDir || getSpikeDirection(tower);
+  if (!dir) return;
+  tower.spikePhase = "extend";
+  tower.spikeProgress = 0;
+  tower.spikeHit = false;
+  tower.spikeDrillTarget = null;
+  tower.spikeDrillTimer = 0;
+  tower.spikeDir = dir;
+}
+
 function updateSpikeTower(tower, dt, stats) {
   const data = stats ? stats.data : towerTypes.spikeTower;
   const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
@@ -5000,7 +5014,23 @@ function drawPath() {
 
     ctx.restore();
   }
-  void junctions;
+  for (const entry of junctions.values()) {
+    if (entry.count < 2) continue;
+    ctx.save();
+    ctx.fillStyle = outerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = midColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = innerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawPortalAt(origin, t) {
@@ -6076,6 +6106,11 @@ function update(dt) {
   updateFloorSpikes(simDt);
   updateMines();
   updateTrapSetters(simDt);
+  for (const tower of state.towers) {
+    if (tower.type === "spikeTower") {
+      forceSpikeExtend(tower);
+    }
+  }
   updateTraps(simDt);
   updateTowers(simDt);
   if (state.waveInProgress && state.enemies.length > 0) {
