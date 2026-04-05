@@ -1183,13 +1183,31 @@ function spawnEnemy() {
   }
   if (type === "swarm") {
     registerEnemyInEncyclopedia(type, armored, darkMatter);
-    const pathGroup = Math.floor(Math.random() * getActivePaths().length);
+    const paths = getActivePaths();
+    const pathGroup = Math.floor(Math.random() * paths.length);
+    const pathPoints = paths[pathGroup] || paths[0];
+    const start = pathPoints && pathPoints[0] ? pathPoints[0] : { x: 0, y: 0 };
+    const next = pathPoints && pathPoints[1] ? pathPoints[1] : { x: start.x + 1, y: start.y };
+    const dx = next.x - start.x;
+    const dy = next.y - start.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const tangent = { x: dx / len, y: dy / len };
+    const normal = { x: -tangent.y, y: tangent.x };
+    const spacing = 10;
+    const lateral = 10;
     for (let i = 0; i < 20; i += 1) {
+      const along = -i * spacing;
+      const side = (i % 2 === 0 ? 1 : -1) * (Math.random() * lateral);
+      const pathOffset = {
+        x: tangent.x * along + normal.x * side,
+        y: tangent.y * along + normal.y * side,
+      };
       state.enemies.push(createEnemy("swarmlet", {
         armored: false,
         darkMatter: false,
         stealth: false,
         pathGroup,
+        pathOffset,
       }));
     }
     return;
@@ -1253,7 +1271,7 @@ function createEnemy(type, options = {}) {
   const pathPoints = activePaths[pathGroup] || activePaths[0];
   const start = pathPoints[0];
   const pathOffset = type === "swarmlet"
-    ? { x: (Math.random() - 0.5) * 18, y: (Math.random() - 0.5) * 18 }
+    ? (options.pathOffset || { x: (Math.random() - 0.5) * 22, y: (Math.random() - 0.5) * 22 })
     : null;
   const isStealth = coalesce(options.stealth, type === "stealth");
   const baseCastleDamage = type === "swarm" || type === "swarmlet" ? 8 : 5;
@@ -3518,7 +3536,7 @@ function getTrapSetterStats(tower) {
   const level = tower.level || 1;
   const tier = Math.min(level, 5);
   const path = tower.upgradePath || 1;
-  let trapInterval = 4;
+  let trapInterval = 5;
   let trapLifetime = 30;
   let trapDamage = 9;
   let trapType = "spike";
@@ -3602,18 +3620,34 @@ function getTrapSetterStats(tower) {
 }
 
 function findTrapSpawnPoint(tower, onPath, range, snap = true) {
-  for (let i = 0; i < 12; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const minRadius = Math.max(30, range * 0.35);
-    const maxRadius = Math.max(minRadius + 20, range);
-    const radius = minRadius + Math.random() * (maxRadius - minRadius);
-    const x = tower.x + Math.cos(angle) * radius;
-    const y = tower.y + Math.sin(angle) * radius;
-    if (x < 8 || x > canvas.width - 8 || y < 8 || y > canvas.height - 8) continue;
-    const point = snap ? snapToGrid(x, y) : { x, y };
-    if (onPath && !isOnPath(point.x, point.y)) continue;
-    if (!onPath && isOnPath(point.x, point.y)) continue;
-    return point;
+  if (onPath) {
+    const paths = getActivePaths();
+    const candidates = [];
+    for (const points of paths) {
+      for (const node of points) {
+        const dist = Math.hypot(node.x - tower.x, node.y - tower.y);
+        if (dist <= range) {
+          candidates.push(node);
+        }
+      }
+    }
+    if (candidates.length > 0) {
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      return snap ? snapToGrid(pick.x, pick.y) : { x: pick.x, y: pick.y };
+    }
+  } else {
+    for (let i = 0; i < 12; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const minRadius = Math.max(30, range * 0.35);
+      const maxRadius = Math.max(minRadius + 20, range);
+      const radius = minRadius + Math.random() * (maxRadius - minRadius);
+      const x = tower.x + Math.cos(angle) * radius;
+      const y = tower.y + Math.sin(angle) * radius;
+      if (x < 8 || x > canvas.width - 8 || y < 8 || y > canvas.height - 8) continue;
+      const point = snap ? snapToGrid(x, y) : { x, y };
+      if (isOnPath(point.x, point.y)) continue;
+      return point;
+    }
   }
   if (onPath) {
     const paths = getActivePaths();
@@ -3639,8 +3673,17 @@ function spawnTrapFrom(tower, stats) {
   const onPath = !(stats.trapType === "turret" || stats.trapType === "sentry");
   const snap = onPath && !(stats.trapType === "mine" || stats.trapType === "supermine");
   let spawned = 0;
+  const minTrapDistance = 20;
+  const isOverlap = (point) => state.traps.some((trap) => Math.hypot(trap.x - point.x, trap.y - point.y) < minTrapDistance);
   for (let i = 0; i < stats.spawnCount; i += 1) {
-    const point = findTrapSpawnPoint(tower, onPath, stats.trapRange || 140, snap);
+    let point = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = findTrapSpawnPoint(tower, onPath, stats.trapRange || 140, snap);
+      if (!candidate) break;
+      if (isOverlap(candidate)) continue;
+      point = candidate;
+      break;
+    }
     if (!point) continue;
     const smallFootprint = stats.trapType === "turret" || stats.trapType === "sentry";
     if (stats.trapType === "sentry" && stats.sentryLimit > 0) {
@@ -3700,7 +3743,8 @@ function spawnTrapFrom(tower, stats) {
     }
     if (best) {
       const point = snap ? snapToGrid(best.x, best.y) : { x: best.x, y: best.y };
-      state.traps.push({
+      if (!isOverlap(point)) {
+        state.traps.push({
         kind: stats.trapType,
         owner: tower,
         x: tower.x,
@@ -3728,7 +3772,8 @@ function spawnTrapFrom(tower, stats) {
           t: 0,
           duration: 0.25,
         },
-      });
+        });
+      }
     }
   }
 }
