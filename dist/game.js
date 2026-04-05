@@ -5227,9 +5227,14 @@ function drawTowers() {
       } else {
         ctx.stroke();
       }
-      if (tower.type !== "trap") {
+      if (tower.type !== "trap" && tower.type !== "laser") {
         ctx.fillStyle = shadeColor(base, 0.6);
-        ctx.fillRect(6, -3, 12, 6);
+        const barrelWidth = 6;
+        const barrelLen = 14;
+        const barrelInset = 10;
+        ctx.fillRect(barrelInset, -barrelWidth / 2, barrelLen, barrelWidth);
+        ctx.fillStyle = shadeColor(base, 0.75);
+        ctx.fillRect(barrelInset + barrelLen - 3, -barrelWidth / 2, 3, barrelWidth);
       }
       ctx.restore();
     }
