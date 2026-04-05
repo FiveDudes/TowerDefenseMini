@@ -114,6 +114,8 @@ const ui = {
   spawnEnemyDarkMatter: document.getElementById("spawn-enemy-darkmatter"),
   spawnEnemyOnFlame: document.getElementById("spawn-enemy-onflame"),
   spawnEnemyPoisoned: document.getElementById("spawn-enemy-poisoned"),
+  upgradeAllBy: document.getElementById("upgrade-all-by"),
+  upgradeAllByValue: document.getElementById("upgrade-all-by-value"),
   gameOver: document.getElementById("game-over"),
   sixSevenOverlay: document.getElementById("sixseven-overlay"),
   sixSevenGif: document.getElementById("sixseven-gif"),
@@ -1232,6 +1234,9 @@ function spawnEnemy() {
   if (allowArmored && Math.random() < 0.18) armored = true;
   if (allowDarkMatter && Math.random() < 0.15) darkMatter = true;
   if (allowStealthRoll && Math.random() < 0.18) stealth = true;
+  if (armored && darkMatter) {
+    darkMatter = false;
+  }
   if (type === "diamond" || type === "boss_diamond") {
     armored = true;
     darkMatter = false;
@@ -1340,6 +1345,8 @@ function createEnemy(type, options = {}) {
     : null;
   const isStealth = coalesce(options.stealth, type === "stealth");
   const baseCastleDamage = type === "swarm" || type === "swarmlet" ? 8 : 5;
+  const armoredFlag = options.armored || isDiamond || false;
+  const darkMatterFlag = !armoredFlag && !isDiamond && (options.darkMatter || false);
   const enemy = {
     x: start.x + (pathOffset ? pathOffset.x : 0),
     y: start.y + (pathOffset ? pathOffset.y : 0),
@@ -1350,8 +1357,8 @@ function createEnemy(type, options = {}) {
     pathIndex: 0,
     slowTimer: 0,
     type,
-    armored: options.armored || isDiamond || false,
-    darkMatter: !isDiamond && (options.darkMatter || false),
+    armored: armoredFlag,
+    darkMatter: darkMatterFlag,
     dotTimer: 0,
     dotDps: 0,
     burnTimer: 0,
@@ -2249,6 +2256,23 @@ function getTowerDescription(type) {
       return "Overpowered beam that deletes enemies.";
     default:
       return "";
+  }
+}
+
+function upgradeTowerFree(tower, amount) {
+  if (!tower || tower.type === "wall" || tower.type === "mine") return;
+  const cap = state.towerLevelCap || 5;
+  const current = tower.level || 1;
+  const next = Math.min(cap, Math.max(1, current + amount));
+  if (next <= current) return;
+  tower.level = next;
+  if (tower.type === "bomb" && tower.level >= 5 && !tower.bombNukeGranted) {
+    tower.bombNukeGranted = true;
+    state.nukeCharges += 1;
+  }
+  if (tower.type === "drone") {
+    const stats = getTowerStats(tower);
+    if (stats) ensureDroneMinis(tower, stats);
   }
 }
 
@@ -6958,11 +6982,15 @@ if (ui.jasperModal) {
       const type = (ui.spawnEnemyType ? ui.spawnEnemyType.value : undefined) || "grunt";
       const count = Math.max(1, Number.parseInt((ui.spawnEnemyCount ? ui.spawnEnemyCount.value : undefined) || "1", 10));
       const radioactive = Boolean(ui.spawnEnemyRadioactive ? ui.spawnEnemyRadioactive.checked : undefined);
-      const armored = Boolean(ui.spawnEnemyArmored ? ui.spawnEnemyArmored.checked : undefined);
-      const darkMatter = Boolean(ui.spawnEnemyDarkMatter ? ui.spawnEnemyDarkMatter.checked : undefined);
+      let armored = Boolean(ui.spawnEnemyArmored ? ui.spawnEnemyArmored.checked : undefined);
+      let darkMatter = Boolean(ui.spawnEnemyDarkMatter ? ui.spawnEnemyDarkMatter.checked : undefined);
       const onFlame = Boolean(ui.spawnEnemyOnFlame ? ui.spawnEnemyOnFlame.checked : undefined);
       const poisoned = Boolean(ui.spawnEnemyPoisoned ? ui.spawnEnemyPoisoned.checked : undefined);
       const stealth = type === "stealth";
+      if (armored && darkMatter) {
+        darkMatter = false;
+        if (ui.spawnEnemyDarkMatter) ui.spawnEnemyDarkMatter.checked = false;
+      }
       for (let i = 0; i < count; i += 1) {
         if (type === "swarm") {
           registerEnemyInEncyclopedia(type, armored, darkMatter);
@@ -6974,6 +7002,19 @@ if (ui.jasperModal) {
         registerEnemyInEncyclopedia(type, armored, darkMatter, stealth);
         state.enemies.push(createEnemy(type, { armored, darkMatter, onFlame, poisoned, radioactive, stealth }));
       }
+    });
+  }
+
+  if (ui.upgradeAllBy) {
+    ui.upgradeAllBy.addEventListener("click", () => {
+      if (!state.infiniteGold) return;
+      const raw = ui.upgradeAllByValue ? ui.upgradeAllByValue.value : "1";
+      const amount = Math.max(1, Number.parseInt(raw || "1", 10));
+      for (const tower of state.towers) {
+        upgradeTowerFree(tower, amount);
+      }
+      updateHud();
+      updateUpgradePanel();
     });
   }
 

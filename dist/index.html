@@ -271,20 +271,27 @@
             <input id="tower-level-cap" type="number" min="0" value="5" placeholder="∞" />
           </div>
           <div class="control-row">
+            <label for="upgrade-all-by-value">Upgrade All By</label>
+            <input id="upgrade-all-by-value" type="number" min="1" value="1" />
+            <button id="upgrade-all-by">Upgrade</button>
+          </div>
+          <div class="control-row">
             <label for="spawn-enemy-type">Spawn Enemy</label>
             <select id="spawn-enemy-type">
-              <option value="grunt">Grunt</option>
-              <option value="speedy">Speedy</option>
-              <option value="heavy">Heavy</option>
-              <option value="stealth">Stealth</option>
-              <option value="labrat">Lab Rat</option>
-              <option value="diamond">Diamond</option>
-              <option value="swarm">Swarm</option>
-              <option value="boss">Boss</option>
-              <option value="boss_fast">Fast Boss</option>
-              <option value="boss_pentagon">Pentagon Boss</option>
-              <option value="boss_hexagon">Hexagon Boss</option>
-              <option value="boss_diamond">Diamond Boss</option>
+              <option value="grunt">Vanguard</option>
+              <option value="speedy">Bolt</option>
+              <option value="heavy">Juggernaut</option>
+              <option value="stealth">Shade</option>
+              <option value="labrat">Cipher</option>
+              <option value="diamond">Prism</option>
+              <option value="flying">Skimmer</option>
+              <option value="aegis">Aegis</option>
+              <option value="swarm">Brood</option>
+              <option value="boss">Titan</option>
+              <option value="boss_fast">Fast Titan</option>
+              <option value="boss_pentagon">Pentagon Titan</option>
+              <option value="boss_hexagon">Hexagon Titan</option>
+              <option value="boss_diamond">Diamond Titan</option>
             </select>
             <input id="spawn-enemy-count" class="spawn-count" type="number" min="1" value="1" />
             <button id="spawn-enemy">Spawn</button>
