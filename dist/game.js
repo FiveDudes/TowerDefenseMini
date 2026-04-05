@@ -229,6 +229,8 @@ window.getState = () => state;
 window.updateTowers = updateTowers;
 window.getTowerStats = getTowerStats;
 window.selectTarget = selectTarget;
+window.getNearestPathPoint = getNearestPathPoint;
+window.getSpikeDirection = getSpikeDirection;
 window.debugState = () => ({
   wave: state.wave,
   waveInProgress: state.waveInProgress,
@@ -5002,7 +5004,23 @@ function drawPath() {
 
     ctx.restore();
   }
-  void junctions;
+  for (const entry of junctions.values()) {
+    if (entry.count < 2) continue;
+    ctx.save();
+    ctx.fillStyle = outerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = midColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = innerColor;
+    ctx.beginPath();
+    ctx.arc(entry.x, entry.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawPortalAt(origin, t) {
