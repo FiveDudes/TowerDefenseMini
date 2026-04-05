@@ -3679,10 +3679,6 @@ function selectTarget(tower, stats) {
       fallback.push({ enemy, dist });
     }
   }
-  if (candidates.length === 0 && fallback.length > 0) {
-    fallback.sort((a, b) => a.dist - b.dist);
-    return fallback[0].enemy;
-  }
   if (candidates.length === 0) return null;
   let filtered = candidates;
   if (tower.type === "watch") {
