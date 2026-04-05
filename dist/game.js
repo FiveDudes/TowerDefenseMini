@@ -3927,6 +3927,21 @@ function getSpikeLaneHalfWidth() {
   return grid.size * 1.1;
 }
 
+function triggerSpikeTestExtend() {
+  for (const tower of state.towers) {
+    if (tower.type !== "spikeTower") continue;
+    const dir = getSpikeDirection(tower);
+    if (!dir) continue;
+    tower.spikeDir = dir;
+    tower.spikePhase = "extend";
+    tower.spikeProgress = 0;
+    tower.spikeHoldTimer = 0;
+    tower.spikeHit = false;
+    tower.spikeDrillTarget = null;
+    tower.spikeDrillTimer = 0;
+  }
+}
+
 function hasEnemyInSpikeLane(tower, range) {
   const dir = tower.spikeDir || getSpikeDirection(tower);
   const nearest = getNearestPathPoint(tower.x, tower.y);
@@ -7071,6 +7086,9 @@ window.addEventListener("keydown", (event) => {
       }
       state.controlledDrone = closest;
     }
+  }
+  if (event.key === "ArrowUp") {
+    triggerSpikeTestExtend();
   }
   const key = event.key.toLowerCase();
   if (key.length === 1 && key >= "a" && key <= "z") {
