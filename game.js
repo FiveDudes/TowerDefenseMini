@@ -3933,9 +3933,9 @@ function triggerSpikeTestExtend() {
     const dir = getSpikeDirection(tower);
     if (!dir) continue;
     tower.spikeDir = dir;
-    tower.spikePhase = "extend";
-    tower.spikeProgress = 0;
-    tower.spikeHoldTimer = 0;
+    tower.spikePhase = "hold";
+    tower.spikeProgress = 1;
+    tower.spikeHoldTimer = 1.5;
     tower.spikeHit = false;
     tower.spikeDrillTarget = null;
     tower.spikeDrillTimer = 0;
