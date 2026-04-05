@@ -4148,10 +4148,7 @@ function updateTowers(dt) {
     const data = stats.data;
     if (tower.disabled) continue;
     if (data.isMine || data.isFloorSpike || data.blocksPath) continue;
-    if (tower.type === "spikeTower") {
-      updateSpikeTower(tower, dt, stats);
-      continue;
-    }
+    if (tower.type === "spikeTower") continue;
     if (tower.type === "drone" && stats.droneBombRate > 0) {
       tower.bombCooldown = Math.max(0, (tower.bombCooldown || 0) - dt);
     }
@@ -4249,6 +4246,16 @@ function updateTowers(dt) {
         lingering.maxTtl = Math.max(lingering.maxTtl || 0, lingering.ttl);
       }
     }
+  }
+}
+
+function updateSpikeTowers(dt) {
+  for (const tower of state.towers) {
+    if (tower.type !== "spikeTower") continue;
+    if (tower.disabled) continue;
+    const stats = getTowerStats(tower);
+    if (!stats) continue;
+    updateSpikeTower(tower, dt, stats);
   }
 }
 
@@ -6139,6 +6146,7 @@ function update(dt) {
   }
   updateSpawner(dt);
   updateEnemies(simDt);
+  updateSpikeTowers(simDt);
   updateFloorSpikes(simDt);
   updateMines();
   updateTrapSetters(simDt);
