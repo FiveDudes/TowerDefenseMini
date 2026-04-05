@@ -3930,10 +3930,7 @@ function hasEnemyInSpikeLane(tower, dir, range) {
     }
     if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
     if (isOnPath(enemy.x, enemy.y)) {
-      const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
-      if (dist <= range + grid.size) {
-        return true;
-      }
+      return true;
     }
     const dx = enemy.x - tower.x;
     const dy = enemy.y - tower.y;
