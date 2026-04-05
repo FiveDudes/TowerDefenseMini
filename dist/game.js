@@ -1945,7 +1945,7 @@ function getTowerStats(tower) {
       const path = tower.upgradePath || 1;
       const nearest = getNearestPathPoint(tower.x, tower.y);
       if (nearest) {
-        spikeRange = nearest.dist + 60;
+        spikeRange = nearest.dist + 80;
       }
       spikeDamage = data.damage;
       spikeExtendSpeed = data.spikeExtendSpeed;
@@ -3946,6 +3946,7 @@ function forceSpikeExtend(tower) {
   if (!hasEnemyInRange(tower, range)) return;
   const dir = getSpikeDirection(tower);
   if (!dir) return;
+  tower.spikeDir = dir;
   tower.spikePhase = "extend";
   tower.spikeProgress = 0;
   tower.spikeHit = false;
@@ -3975,6 +3976,9 @@ function updateSpikeTower(tower, dt, stats) {
     return best ? best.enemy : null;
   };
   let dir = getSpikeDirection(tower);
+  if (dir) {
+    tower.spikeDir = dir;
+  }
   const spikeDamage = (stats && stats.spikeDamage) || data.damage || 0;
   const spikeCount = (stats && stats.spikeCount) || 1;
   const spikeSlow = (stats && stats.spikeSlow) || 0;
