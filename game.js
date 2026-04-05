@@ -3924,7 +3924,7 @@ function updateTrapSetters(dt) {
 }
 
 function getSpikeLaneHalfWidth() {
-  return grid.size * 0.55;
+  return grid.size * 1.1;
 }
 
 function hasEnemyInSpikeLane(tower, range) {
