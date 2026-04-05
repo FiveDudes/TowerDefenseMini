@@ -4017,8 +4017,35 @@ function updateSpikeTower(tower, dt, stats) {
     hits.sort((a, b) => a.dist - b.dist);
     return hits;
   };
+  const collectSpikeContactHits = (limit) => {
+    const hits = [];
+    const sx = tower.x;
+    const sy = tower.y;
+    const ex = tower.x + dir.x * limit;
+    const ey = tower.y + dir.y * limit;
+    const lineLenSq = (ex - sx) * (ex - sx) + (ey - sy) * (ey - sy);
+    for (const enemy of state.enemies) {
+      if (enemy.hp <= 0) continue;
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+        ensureEnemyPath(enemy);
+      }
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+      const px = enemy.x;
+      const py = enemy.y;
+      const t = lineLenSq > 0 ? Math.max(0, Math.min(1, ((px - sx) * (ex - sx) + (py - sy) * (ey - sy)) / lineLenSq)) : 0;
+      const cx = sx + (ex - sx) * t;
+      const cy = sy + (ey - sy) * t;
+      const radius = getEnemyRadius(enemy);
+      const dist = Math.hypot(px - cx, py - cy);
+      if (dist <= radius + 6) {
+        hits.push({ enemy, dist: t * limit });
+      }
+    }
+    hits.sort((a, b) => a.dist - b.dist);
+    return hits;
+  };
   const applyLaneDamage = (limit, damage, slow, stun) => {
-    const hits = collectLaneHits(limit);
+    const hits = collectSpikeContactHits(limit);
     const hitTargets = hits.slice(0, Math.max(1, spikeCount));
     for (const entry of hitTargets) {
       applySpikeEffects(entry.enemy, damage, slow, stun);
@@ -4066,7 +4093,7 @@ function updateSpikeTower(tower, dt, stats) {
     return;
   }
   if (phase === "hold") {
-    applyLaneDamage(maxLen, spikeDamage * dt, spikeSlow, 0.05);
+    applyLaneDamage(maxLen, 0, 0, 0);
     tower.spikeHoldTimer = Math.max(0, (tower.spikeHoldTimer || 0) - dt);
     if (drillDps > 0 && tower.spikeDrillTarget && tower.spikeDrillTarget.hp > 0) {
       const target = tower.spikeDrillTarget;
