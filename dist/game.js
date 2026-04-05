@@ -966,8 +966,8 @@ function getNearestPathPoint(x, y) {
 function getSpikeDirection(tower) {
   const nearest = getNearestPathPoint(tower.x, tower.y);
   if (!nearest) return null;
-  const dx = nearest.point.x - tower.x;
-  const dy = nearest.point.y - tower.y;
+  const dx = tower.x - nearest.point.x;
+  const dy = tower.y - nearest.point.y;
   if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return null;
   if (Math.abs(dx) >= Math.abs(dy)) {
     return { x: Math.sign(dx), y: 0 };
