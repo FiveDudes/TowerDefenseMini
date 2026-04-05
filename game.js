@@ -3932,9 +3932,9 @@ function hasEnemyInSpikeLane(tower, dir, range) {
     const dx = enemy.x - tower.x;
     const dy = enemy.y - tower.y;
     const forward = dx * dir.x + dy * dir.y;
-    if (forward <= 0 || forward > range) continue;
+    if (forward <= 0 || forward > range + 8) continue;
     const side = Math.abs(dir.x ? dy : dx);
-    if (side <= 16) {
+    if (side <= 28) {
       return true;
     }
   }
