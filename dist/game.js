@@ -946,7 +946,7 @@ function updateEncyclopedia() {
   const enemyEntries = [
     {
       key: "grunt",
-      name: "Grunt Frog",
+      name: "Grunt",
       desc: "Standard enemy with balanced speed.",
     },
     {
@@ -956,17 +956,17 @@ function updateEncyclopedia() {
     },
     {
       key: "heavy",
-      name: "Heavy Frog",
+      name: "Heavy",
       desc: "Very tanky but slow.",
     },
     {
       key: "stealth",
-      name: "Stealth Frog",
+      name: "Stealth",
       desc: "Hidden until tapped. Watch towers can see it.",
     },
     {
       key: "boss",
-      name: "Boss Frog",
+      name: "Boss",
       desc: "Huge health. Shows up every 10 waves.",
     },
     {
@@ -976,7 +976,7 @@ function updateEncyclopedia() {
     },
     {
       key: "diamond",
-      name: "Diamond Frog",
+      name: "Diamond",
       desc: "Armored, light-blue foe. Immune to heat and explosions.",
     },
     {
@@ -1332,7 +1332,7 @@ function placeTower(type, x, y) {
   if (isOnPath(x, y) && !data.allowOnPath && !data.blocksPath) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
   if (type === "drone" && isOnPath(x, y)) return;
-  if (data.blocksPath && state.waveInProgress) return;
+  if (data.blocksPath && state.waveInProgress && isOnPath(x, y)) return;
   for (const tower of state.towers) {
     const towerData = towerTypes[tower.type];
     if (towerData && towerData.noGridlock) continue;
@@ -5722,7 +5722,7 @@ function drawPlacementPreview() {
   const data = towerTypes[state.placing];
   if (!data) return;
   const invalidPath = isOnPath(snapped.x, snapped.y) && !data.allowOnPath && !data.blocksPath;
-  const invalidWave = Boolean(data.blocksPath && state.waveInProgress);
+  const invalidWave = Boolean(data.blocksPath && state.waveInProgress && isOnPath(snapped.x, snapped.y));
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
   const invalid = invalidPath || invalidMine || invalidWave;
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
