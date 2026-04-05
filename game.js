@@ -4002,7 +4002,7 @@ function updateSpikeTower(tower, dt, stats) {
       const forward = dx * dir.x + dy * dir.y;
       if (forward <= 0 || forward > maxLen) continue;
       const side = Math.abs(dir.x ? dy : dx);
-      if (side > 12) continue;
+      if (side > 40) continue;
       hits.push({ enemy, dist: forward });
     }
     hits.sort((a, b) => a.dist - b.dist);
@@ -4073,6 +4073,14 @@ function updateSpikeTower(tower, dt, stats) {
       return;
     }
     if (next >= 1) {
+      if (!tower.spikeHit) {
+        const hits = findTargets();
+        const hitTargets = hits.slice(0, Math.max(1, spikeCount));
+        for (const entry of hitTargets) {
+          applySpikeEffects(entry.enemy, spikeDamage, spikeSlow, spikeHold);
+        }
+        tower.spikeHit = hitTargets.length > 0;
+      }
       tower.spikePhase = "hold";
       tower.spikeHoldTimer = spikeHold;
     }
