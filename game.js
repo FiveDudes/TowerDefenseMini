@@ -1946,7 +1946,7 @@ function getTowerStats(tower) {
       const path = tower.upgradePath || 1;
       spikeDamage = data.damage;
       spikeRange = grid.size * 5;
-      spikeHitRange = grid.size * 7;
+      spikeHitRange = grid.size * 10;
       spikeExtendSpeed = data.spikeExtendSpeed;
       spikeRetractSpeed = data.spikeRetractSpeed;
       spikeHold = data.spikeHold;
