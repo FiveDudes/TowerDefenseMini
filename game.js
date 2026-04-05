@@ -3638,6 +3638,7 @@ function findTrapSpawnPoint(tower, onPath, range, snap = true) {
 function spawnTrapFrom(tower, stats) {
   const onPath = !(stats.trapType === "turret" || stats.trapType === "sentry");
   const snap = onPath && !(stats.trapType === "mine" || stats.trapType === "supermine");
+  let spawned = 0;
   for (let i = 0; i < stats.spawnCount; i += 1) {
     const point = findTrapSpawnPoint(tower, onPath, stats.trapRange || 140, snap);
     if (!point) continue;
@@ -3682,6 +3683,53 @@ function spawnTrapFrom(tower, stats) {
         duration: 0.25,
       },
     });
+    spawned += 1;
+  }
+  if (spawned === 0 && onPath) {
+    const paths = getActivePaths();
+    let best = null;
+    let bestDist = Infinity;
+    for (const points of paths) {
+      for (const node of points) {
+        const dist = Math.hypot(node.x - tower.x, node.y - tower.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = node;
+        }
+      }
+    }
+    if (best) {
+      const point = snap ? snapToGrid(best.x, best.y) : { x: best.x, y: best.y };
+      state.traps.push({
+        kind: stats.trapType,
+        owner: tower,
+        x: tower.x,
+        y: tower.y,
+        ttl: stats.trapType === "sentry" ? Infinity : stats.trapLifetime,
+        life: stats.trapType === "sentry" ? Infinity : stats.trapLifetime,
+        damage: stats.trapDamage,
+        hitRadius: stats.trapType === "turret" || stats.trapType === "sentry" ? 10 : 14,
+        usesLeft: stats.trapType === "sentry" || stats.trapType === "turret" ? undefined : 12,
+        slow: stats.slow,
+        explode: stats.explode,
+        splashRadius: stats.splashRadius,
+        turret: stats.turret,
+        turretRange: stats.turretRange,
+        turretDamage: stats.turretDamage,
+        turretRate: stats.turretRate,
+        dual: stats.dual,
+        cooldown: 0,
+        createdAt: performance.now(),
+        launch: {
+          sx: tower.x,
+          sy: tower.y,
+          tx: point.x,
+          ty: point.y,
+          t: 0,
+          duration: 0.25,
+        },
+      });
+    }
   }
 }
 
@@ -3760,6 +3808,10 @@ function updateSpikeTower(tower, dt, stats) {
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0) continue;
       if (enemy.stealth && !enemy.revealed && tower.type !== "watch" && tower.type !== "op" && !state.revealStealth && !stats?.canHitStealth) continue;
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+        ensureEnemyPath(enemy);
+      }
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
       const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
       if (dist > maxLen) continue;
       if (!best || dist < best.dist) {
@@ -3798,6 +3850,10 @@ function updateSpikeTower(tower, dt, stats) {
     const hits = [];
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0) continue;
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+        ensureEnemyPath(enemy);
+      }
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
       const dx = enemy.x - tower.x;
       const dy = enemy.y - tower.y;
       const forward = dx * dir.x + dy * dir.y;
