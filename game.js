@@ -3994,28 +3994,18 @@ function updateSpikeTower(tower, dt, stats) {
       }
     }
     if (!target) {
-      let nearest = null;
-      for (const enemy of state.enemies) {
-        if (enemy.hp <= 0) continue;
-        if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
-          ensureEnemyPath(enemy);
-        }
-        if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
-        const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
-        if (!nearest || dist < nearest.dist) {
-          nearest = { enemy, dist };
-        }
-      }
-      if (!nearest || nearest.dist > maxLen) return;
-      const dx = nearest.enemy.x - tower.x;
-      const dy = nearest.enemy.y - tower.y;
-      dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
-      target = nearest.enemy;
-    } else {
-      const dx = target.x - tower.x;
-      const dy = target.y - tower.y;
-      dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+      if (!dir) return;
+      tower.spikePhase = "extend";
+      tower.spikeProgress = 0;
+      tower.spikeHit = false;
+      tower.spikeDrillTarget = null;
+      tower.spikeDrillTimer = 0;
+      tower.spikeDir = dir;
+      return;
     }
+    const dx = target.x - tower.x;
+    const dy = target.y - tower.y;
+    dir = Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
     tower.spikePhase = "extend";
     tower.spikeProgress = 0;
     tower.spikeHit = false;
