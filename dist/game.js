@@ -1944,7 +1944,7 @@ function getTowerStats(tower) {
       const tier = Math.min(level, 5);
       const path = tower.upgradePath || 1;
       spikeDamage = data.damage;
-      spikeRange = grid.size * 1.25;
+      spikeRange = grid.size * 5;
       spikeExtendSpeed = data.spikeExtendSpeed;
       spikeRetractSpeed = data.spikeRetractSpeed;
       spikeHold = data.spikeHold;
@@ -5468,9 +5468,11 @@ function drawTowers() {
       ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
       const dir = tower.spikeDir || getSpikeDirection(tower);
       if (dir) {
+        const stats = getTowerStats(tower);
+        const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
         const rawProgress = tower.spikeProgress || 0;
         const progress = rawProgress > 0 ? Math.max(rawProgress, 0.12) : 0;
-        const len = (data.spikeRange || 32) * progress;
+        const len = maxLen * progress;
         const tipX = tower.x + dir.x * len;
         const tipY = tower.y + dir.y * len;
         ctx.fillStyle = shadeColor(base, 1.1);
