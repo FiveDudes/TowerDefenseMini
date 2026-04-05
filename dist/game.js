@@ -1332,6 +1332,7 @@ function placeTower(type, x, y) {
   if (isOnPath(x, y) && !data.allowOnPath && !data.blocksPath) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
   if (type === "drone" && isOnPath(x, y)) return;
+  if (data.blocksPath && state.waveInProgress) return;
   for (const tower of state.towers) {
     const towerData = towerTypes[tower.type];
     if (towerData && towerData.noGridlock) continue;
@@ -3042,7 +3043,16 @@ function fireFlameCone(tower, enemy, stats) {
     full: igniteAll || igniteRadius > 0,
     radius: Math.max(igniteRadius, range),
   });
-  spawnNukeEmbers(originX + Math.cos(angle) * 18, originY + Math.sin(angle) * 18, 6);
+  const emberCount = 14;
+  for (let i = 0; i < emberCount; i += 1) {
+    const t = 0.2 + Math.random() * 0.6;
+    const jitter = (Math.random() - 0.5) * coneAngle * 0.8;
+    const emberAngle = angle + jitter;
+    const dist = range * t;
+    const ex = originX + Math.cos(emberAngle) * dist;
+    const ey = originY + Math.sin(emberAngle) * dist;
+    spawnNukeEmbers(ex, ey, 1);
+  }
 }
 
 function updateProjectiles(dt) {
@@ -5230,8 +5240,8 @@ function drawTowers() {
       if (tower.type !== "trap" && tower.type !== "laser") {
         ctx.fillStyle = shadeColor(base, 0.6);
         const barrelWidth = 6;
-        const barrelLen = 14;
-        const barrelInset = 10;
+        const barrelLen = 12;
+        const barrelInset = 16;
         ctx.fillRect(barrelInset, -barrelWidth / 2, barrelLen, barrelWidth);
         ctx.fillStyle = shadeColor(base, 0.75);
         ctx.fillRect(barrelInset + barrelLen - 3, -barrelWidth / 2, 3, barrelWidth);
@@ -5712,8 +5722,9 @@ function drawPlacementPreview() {
   const data = towerTypes[state.placing];
   if (!data) return;
   const invalidPath = isOnPath(snapped.x, snapped.y) && !data.allowOnPath && !data.blocksPath;
+  const invalidWave = Boolean(data.blocksPath && state.waveInProgress);
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
-  const invalid = invalidPath || invalidMine;
+  const invalid = invalidPath || invalidMine || invalidWave;
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -5835,6 +5846,35 @@ function update(dt) {
       const data = stats.data;
       if (tower.disabled) continue;
       if (data.isMine || data.isFloorSpike || tower.type === "wall" || tower.type === "spikeTower" || tower.type === "trap") continue;
+      if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0 && !tower.isMini) {
+        if (!tower.spawnedMinis) {
+          tower.spawnedMinis = [];
+        }
+        const miniTargetCount = stats.droneMiniCount;
+        while (tower.spawnedMinis.length < miniTargetCount) {
+          const offset = tower.spawnedMinis.length === 0 ? { x: -18, y: -10 } : { x: 18, y: -10 };
+          const ox = tower.x + offset.x;
+          const oy = tower.y + offset.y;
+          const mini = {
+            type: "drone",
+            x: ox,
+            y: oy,
+            baseX: ox,
+            baseY: oy,
+            level: Math.max(1, (tower.level || 1) - 1),
+            cooldown: 0,
+            paidCost: 0,
+            disabled: false,
+            targeting: tower.targeting || "first",
+            upgradePath: tower.upgradePath || 2,
+            isMini: true,
+            parentDrone: tower,
+          };
+          state.towers.push(mini);
+          tower.spawnedMinis.push(mini);
+        }
+        tower.spawnedMinis = tower.spawnedMinis.filter((mini) => state.towers.includes(mini));
+      }
       tower.cooldown = Math.max(0, (tower.cooldown || 0) - simDt);
       if (tower.cooldown > 0 && tower.type !== "freeze") continue;
       const target = selectTarget(tower, stats);
