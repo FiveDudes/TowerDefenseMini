@@ -1441,6 +1441,10 @@ function upgradeTower(tower) {
     tower.bombNukeGranted = true;
     state.nukeCharges += 1;
   }
+  if (tower.type === "drone") {
+    const stats = getTowerStats(tower);
+    if (stats) ensureDroneMinis(tower, stats);
+  }
   updateHud();
 }
 
@@ -3873,6 +3877,43 @@ function updateSpikeTower(tower, dt, stats) {
   }
 }
 
+function ensureDroneMinis(tower, stats) {
+  if (!tower || tower.type !== "drone" || tower.isMini) return;
+  const miniTargetCount = stats.droneMiniCount || 0;
+  if (!tower.spawnedMinis) {
+    tower.spawnedMinis = [];
+  }
+  tower.spawnedMinis = tower.spawnedMinis.filter((mini) => state.towers.includes(mini));
+  while (tower.spawnedMinis.length < miniTargetCount) {
+    const offset = tower.spawnedMinis.length === 0 ? { x: -18, y: -10 } : { x: 18, y: -10 };
+    const ox = tower.x + offset.x;
+    const oy = tower.y + offset.y;
+    const mini = {
+      type: "drone",
+      x: ox,
+      y: oy,
+      baseX: ox,
+      baseY: oy,
+      level: Math.max(1, (tower.level || 1) - 1),
+      cooldown: 0,
+      paidCost: 0,
+      disabled: false,
+      targeting: tower.targeting || "first",
+      upgradePath: tower.upgradePath || 2,
+      isMini: true,
+      parentDrone: tower,
+    };
+    state.towers.push(mini);
+    tower.spawnedMinis.push(mini);
+  }
+  if (tower.spawnedMinis.length > miniTargetCount) {
+    const extras = tower.spawnedMinis.splice(miniTargetCount);
+    for (const extra of extras) {
+      state.towers = state.towers.filter((entry) => entry !== extra);
+    }
+  }
+}
+
 function updateTowers(dt) {
   updateTowerMovement(dt);
   if (state.nukeSmoke) {
@@ -3912,34 +3953,8 @@ function updateTowers(dt) {
     if (target) {
       tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
     }
-    if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0 && !tower.isMini) {
-      if (!tower.spawnedMinis) {
-        tower.spawnedMinis = [];
-      }
-      const miniTargetCount = stats.droneMiniCount;
-      while (tower.spawnedMinis.length < miniTargetCount) {
-        const offset = tower.spawnedMinis.length === 0 ? { x: -18, y: -10 } : { x: 18, y: -10 };
-        const ox = tower.x + offset.x;
-        const oy = tower.y + offset.y;
-        const mini = {
-          type: "drone",
-          x: ox,
-          y: oy,
-          baseX: ox,
-          baseY: oy,
-          level: Math.max(1, (tower.level || 1) - 1),
-          cooldown: 0,
-          paidCost: 0,
-          disabled: false,
-          targeting: tower.targeting || "first",
-          upgradePath: tower.upgradePath || 2,
-          isMini: true,
-          parentDrone: tower,
-        };
-        state.towers.push(mini);
-        tower.spawnedMinis.push(mini);
-      }
-      tower.spawnedMinis = tower.spawnedMinis.filter((mini) => state.towers.includes(mini));
+    if (tower.type === "drone") {
+      ensureDroneMinis(tower, stats);
     }
     if (tower.type === "laser" && stats.laserContinuous) {
       if (tower.laserOverheatTimer > 0) {
@@ -5852,34 +5867,8 @@ function update(dt) {
       const data = stats.data;
       if (tower.disabled) continue;
       if (data.isMine || data.isFloorSpike || tower.type === "wall" || tower.type === "spikeTower" || tower.type === "trap") continue;
-      if (tower.type === "drone" && (stats.droneMiniCount || 0) > 0 && !tower.isMini) {
-        if (!tower.spawnedMinis) {
-          tower.spawnedMinis = [];
-        }
-        const miniTargetCount = stats.droneMiniCount;
-        while (tower.spawnedMinis.length < miniTargetCount) {
-          const offset = tower.spawnedMinis.length === 0 ? { x: -18, y: -10 } : { x: 18, y: -10 };
-          const ox = tower.x + offset.x;
-          const oy = tower.y + offset.y;
-          const mini = {
-            type: "drone",
-            x: ox,
-            y: oy,
-            baseX: ox,
-            baseY: oy,
-            level: Math.max(1, (tower.level || 1) - 1),
-            cooldown: 0,
-            paidCost: 0,
-            disabled: false,
-            targeting: tower.targeting || "first",
-            upgradePath: tower.upgradePath || 2,
-            isMini: true,
-            parentDrone: tower,
-          };
-          state.towers.push(mini);
-          tower.spawnedMinis.push(mini);
-        }
-        tower.spawnedMinis = tower.spawnedMinis.filter((mini) => state.towers.includes(mini));
+      if (tower.type === "drone") {
+        ensureDroneMinis(tower, stats);
       }
       tower.cooldown = Math.max(0, (tower.cooldown || 0) - simDt);
       if (tower.cooldown > 0 && tower.type !== "freeze") continue;
@@ -6129,6 +6118,10 @@ if (ui.upgradeTo) {
     if (tower.type === "bomb" && tower.level >= 5 && !tower.bombNukeGranted) {
       tower.bombNukeGranted = true;
       state.nukeCharges += 1;
+    }
+    if (tower.type === "drone") {
+      const stats = getTowerStats(tower);
+      if (stats) ensureDroneMinis(tower, stats);
     }
     updateHud();
     updateUpgradePanel();
