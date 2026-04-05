@@ -5836,7 +5836,7 @@ function update(dt) {
       if (data.isMine || data.isFloorSpike || tower.type === "wall" || tower.type === "spikeTower" || tower.type === "trap") continue;
       tower.cooldown = Math.max(0, (tower.cooldown || 0) - simDt);
       if (tower.cooldown > 0 && tower.type !== "freeze") continue;
-      const target = selectTarget(tower, stats) || getClosestEnemyTarget(tower.x, tower.y);
+      const target = selectTarget(tower, stats);
       if (!target) continue;
       tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
       if (tower.type === "freeze") {
