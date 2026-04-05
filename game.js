@@ -3929,23 +3929,22 @@ function getSpikeLaneHalfWidth() {
 
 function hasEnemyInSpikeLane(tower, range) {
   const dir = tower.spikeDir || getSpikeDirection(tower);
-  if (!dir) return false;
-  const laneHalfWidth = getSpikeLaneHalfWidth();
+  const nearest = getNearestPathPoint(tower.x, tower.y);
+  if (!dir || !nearest) return false;
+  const activationRadius = grid.size * 0.8;
   for (const enemy of state.enemies) {
     if (enemy.hp <= 0) continue;
     if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
       ensureEnemyPath(enemy);
     }
     if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+    const toPoint = Math.hypot(enemy.x - nearest.point.x, enemy.y - nearest.point.y);
+    if (toPoint > activationRadius + getEnemyRadius(enemy)) continue;
     const dx = enemy.x - tower.x;
     const dy = enemy.y - tower.y;
     const forward = dx * dir.x + dy * dir.y;
-    if (forward <= 0 || forward > range) continue;
-    const side = Math.abs(dir.x ? dy : dx);
-    const radius = getEnemyRadius(enemy);
-    if (side <= laneHalfWidth + radius * 0.4) {
-      return true;
-    }
+    if (forward <= 0 || forward > range + grid.size * 0.6) continue;
+    return true;
   }
   return false;
 }
