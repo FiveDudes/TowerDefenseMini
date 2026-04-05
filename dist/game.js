@@ -231,6 +231,7 @@ window.getTowerStats = getTowerStats;
 window.selectTarget = selectTarget;
 window.getNearestPathPoint = getNearestPathPoint;
 window.getSpikeDirection = getSpikeDirection;
+window.triggerSpikeTestExtend = triggerSpikeTestExtend;
 window.debugState = () => ({
   wave: state.wave,
   waveInProgress: state.waveInProgress,
