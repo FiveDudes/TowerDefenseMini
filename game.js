@@ -6957,13 +6957,17 @@ ui.buildDrone.addEventListener("click", () => {
   state.placing = "drone";
 });
 
+function togglePlacing(type) {
+  state.placing = state.placing === type ? null : type;
+}
+
 ui.buildBomb.addEventListener("click", () => {
   const cost = towerTypes.bomb.cost;
   if (!canAfford(cost)) {
     flashButton(buildButtons.bomb);
     return;
   }
-  state.placing = "bomb";
+  togglePlacing("bomb");
 });
 
 ui.buildLaser.addEventListener("click", () => {
@@ -6972,7 +6976,7 @@ ui.buildLaser.addEventListener("click", () => {
     flashButton(buildButtons.laser);
     return;
   }
-  state.placing = "laser";
+  togglePlacing("laser");
 });
 
 ui.buildFlame.addEventListener("click", () => {
@@ -6981,7 +6985,7 @@ ui.buildFlame.addEventListener("click", () => {
     flashButton(buildButtons.flame);
     return;
   }
-  state.placing = "flame";
+  togglePlacing("flame");
 });
 
 ui.buildDart.addEventListener("click", () => {
@@ -6990,7 +6994,7 @@ ui.buildDart.addEventListener("click", () => {
     flashButton(buildButtons.dart);
     return;
   }
-  state.placing = "dart";
+  togglePlacing("dart");
 });
 
 ui.buildTrap.addEventListener("click", () => {
@@ -6999,7 +7003,7 @@ ui.buildTrap.addEventListener("click", () => {
     flashButton(buildButtons.trap);
     return;
   }
-  state.placing = "trap";
+  togglePlacing("trap");
 });
 
 if (ui.buildSpike) {
@@ -7009,7 +7013,7 @@ if (ui.buildSpike) {
       flashButton(buildButtons.spikeTower);
       return;
     }
-    state.placing = "spikeTower";
+    togglePlacing("spikeTower");
   });
 }
 
@@ -7019,7 +7023,7 @@ ui.buildMine.addEventListener("click", () => {
     flashButton(buildButtons.mine);
     return;
   }
-  state.placing = "mine";
+  togglePlacing("mine");
 });
 
 if (ui.buildFloorSpike) {
@@ -7029,7 +7033,7 @@ if (ui.buildFloorSpike) {
       flashButton(buildButtons.floorSpike);
       return;
     }
-    state.placing = "floorSpike";
+    togglePlacing("floorSpike");
   });
 }
 
@@ -7040,7 +7044,7 @@ if (ui.buildWall) {
       flashButton(buildButtons.wall);
       return;
     }
-    state.placing = "wall";
+    togglePlacing("wall");
   });
 }
 
@@ -7051,7 +7055,7 @@ ui.buildOp.addEventListener("click", () => {
     flashButton(buildButtons.op);
     return;
   }
-  state.placing = "op";
+  togglePlacing("op");
 });
 
 ui.startWave.addEventListener("click", startWave);
