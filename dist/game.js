@@ -764,6 +764,11 @@ function updateEnemyPaths() {
   const endCell = state.mapEndCell;
   if (!endCell) return;
   for (const enemy of state.enemies) {
+    const nearest = getNearestPathPointFromPaths(enemy.x, enemy.y, getActivePaths());
+    if (nearest && nearest.dist > 1) {
+      enemy.x = nearest.point.x;
+      enemy.y = nearest.point.y;
+    }
     const currentCell = worldToCell(enemy.x, enemy.y);
     const pathPoints = buildPathPoints(currentCell, endCell, blocked);
     if (!pathPoints) continue;
