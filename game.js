@@ -7930,13 +7930,14 @@ window.addEventListener("keydown", (event) => {
     } else {
       state.jasperProgress = key === "j" ? 1 : 0;
     }
-    if (state.jasperProgress >= 6) {
+    if (state.keyBuffer.endsWith(word)) {
       if (!state.easterUnlocked) {
         unlockJasperMenu();
       } else {
         toggleJasperMode();
       }
       state.jasperProgress = 0;
+      state.keyBuffer = "";
     }
     tryUnlockOpTower();
     tryUnlockInfiniteGold();
