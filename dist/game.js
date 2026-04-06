@@ -1220,7 +1220,6 @@ function startWave() {
   if (state.waveInProgress) return;
   if (!state.gameStarted) return;
   state.wave += 1;
-  handleWaveAlerts(state.wave);
   state.waveInProgress = true;
   if (state.wave % 10 === 0) {
     state.enemiesToSpawn = 1;
@@ -5690,6 +5689,7 @@ function updateSpawner(dt) {
     if (state.radioactiveWave === state.wave) {
       state.radioactiveWave = null;
     }
+    handleWaveAlerts(state.wave + 1);
   }
 }
 
@@ -7708,6 +7708,7 @@ const selectDifficulty = (difficulty) => {
   if (ui.gameOver) ui.gameOver.classList.add("hidden");
   recomputeGlobalPath();
   updateHud();
+  handleWaveAlerts(1);
 };
 if (titleScreen) {
   const buttons = titleScreen.querySelectorAll("[data-difficulty]");
