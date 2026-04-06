@@ -5583,6 +5583,7 @@ function drawPath() {
   const innerColor = lerpColor([24, 74, 110], [120, 40, 150], lossRatio);
   const junctions = new Map();
   const junctionDirs = new Map();
+  const nodeKeys = new Map();
   const addDir = (point, dir) => {
     const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
     if (!junctionDirs.has(key)) {
@@ -5612,6 +5613,22 @@ function drawPath() {
       const opposite = dir === "E" ? "W" : dir === "W" ? "E" : dir === "S" ? "N" : "S";
       addDir(a, dir);
       addDir(b, opposite);
+    }
+  }
+  for (const points of paths) {
+    if (!points || points.length < 3) continue;
+    for (let i = 1; i < points.length - 1; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1];
+      const dx1 = Math.sign(curr.x - prev.x);
+      const dy1 = Math.sign(curr.y - prev.y);
+      const dx2 = Math.sign(next.x - curr.x);
+      const dy2 = Math.sign(next.y - curr.y);
+      if (dx1 !== dx2 || dy1 !== dy2) {
+        const key = `${Math.round(curr.x)}:${Math.round(curr.y)}`;
+        if (!nodeKeys.has(key)) nodeKeys.set(key, { x: curr.x, y: curr.y });
+      }
     }
   }
   for (const points of paths) {
@@ -5653,12 +5670,35 @@ function drawPath() {
     if (entry.count < 2) continue;
     const dirEntry = junctionDirs.get(`${Math.round(entry.x)}:${Math.round(entry.y)}`);
     if (!dirEntry || dirEntry.dirs.size < 2) continue;
-    const connector = 12;
+    const key = `${Math.round(entry.x)}:${Math.round(entry.y)}`;
+    if (!nodeKeys.has(key)) nodeKeys.set(key, { x: entry.x, y: entry.y });
+  }
+  for (const node of nodeKeys.values()) {
+    ctx.save();
+    ctx.fillStyle = outerColor;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = midColor;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = innerColor;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  for (const entry of junctions.values()) {
+    if (entry.count < 2) continue;
+    const dirEntry = junctionDirs.get(`${Math.round(entry.x)}:${Math.round(entry.y)}`);
+    if (!dirEntry || dirEntry.dirs.size < 2) continue;
+    const connector = grid.size / 2;
     const drawConnector = (width, color) => {
       ctx.save();
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
-      ctx.lineCap = "butt";
+      ctx.lineCap = "round";
       for (const dir of dirEntry.dirs) {
         const dx = dir === "E" ? 1 : dir === "W" ? -1 : 0;
         const dy = dir === "S" ? 1 : dir === "N" ? -1 : 0;
