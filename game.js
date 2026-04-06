@@ -2572,6 +2572,11 @@ function updateUpgradePanel() {
     if (ui.spikeUpgradeActions) ui.spikeUpgradeActions.classList.add("hidden");
     return;
   }
+  const stats = getTowerStats(tower);
+  const desc = getTowerDescription(tower.type);
+  const nextTier = (tower.level || 1) + 1;
+  const upgradeCost = getUpgradeCost(tower);
+  let upgradeText = "Upgrades: +damage, +range, faster fire, faster bullets.";
   if (tower.type === "floorSpike") {
     const tier = Math.min(tower.level, 5);
     const path = tower.upgradePath || 1;
@@ -2596,77 +2601,12 @@ function updateUpgradePanel() {
       const nextP1 = path1Upgrades[Math.min(p1Tier, 4)];
       ui.spikePath1.textContent = `Path 1 (${p1Tier}/5): ${nextP1}`;
     }
-    if (tower.type === "floorSpike") {
-      const tier = Math.min(level, 5);
-      const path = tower.upgradePath || 1;
-      floorSpikeDamage = damage;
-      floorSpikeExtendSpeed = data.spikeExtendSpeed || 10;
-      floorSpikeRetractSpeed = data.spikeRetractSpeed || 7;
-      floorSpikeHold = data.spikeHold || 0.2;
-      floorSpikeTriggerRadius = data.triggerRadius || 18;
-      floorSpikeShotDamage = floorSpikeDamage * 0.6;
-      if (path === 1) {
-        if (tier >= 1) {
-          floorSpikeExtendSpeed *= 1.2;
-          floorSpikeRetractSpeed *= 1.1;
-          floorSpikeHold *= 0.9;
-        }
-        if (tier >= 2) {
-          floorSpikeExtendSpeed *= 1.2;
-          floorSpikeRetractSpeed *= 1.15;
-          floorSpikeHold *= 0.85;
-        }
-        if (tier >= 3) {
-          floorSpikeBurnDps = 8;
-          floorSpikeBurnDelay = 0.5;
-        }
-        if (tier >= 4) {
-          floorSpikeBurnDps = 10;
-          floorSpikeBurnDelay = 0.25;
-        }
-        if (tier >= 5) {
-          floorSpikeDamage *= 1.35;
-        }
-      } else {
-        if (tier >= 1) {
-          floorSpikeDamage *= 1.25;
-        }
-        if (tier >= 2) {
-          floorSpikeDamage *= 1.45;
-        }
-        if (tier >= 3) {
-          floorSpikeShooter = true;
-          floorSpikeShotDamage = floorSpikeDamage * 0.6;
-          floorSpikeShotSpeed = 360;
-          floorSpikeShotTtl = 1;
-        }
-        if (tier >= 4) {
-          floorSpikeExtendSpeed *= 1.2;
-          floorSpikeHold *= 0.9;
-          if (floorSpikeShooter) {
-            floorSpikeShotCount = 2;
-          }
-        }
-        if (tier >= 5) {
-          floorSpikeExtendSpeed *= 1.35;
-          floorSpikeHold *= 0.85;
-          if (floorSpikeShooter) {
-            floorSpikeShotCount = 3;
-          }
-        }
-      }
-    }
     if (ui.spikePath2) {
       const p2Tier = path === 2 ? tier : 0;
       const nextP2 = path2Upgrades[Math.min(p2Tier, 4)];
       ui.spikePath2.textContent = `Path 2 (${p2Tier}/5): ${nextP2}`;
     }
   }
-  const stats = getTowerStats(tower);
-  const desc = getTowerDescription(tower.type);
-  const nextTier = (tower.level || 1) + 1;
-  const upgradeCost = getUpgradeCost(tower);
-  let upgradeText = "Upgrades: +damage, +range, faster fire, faster bullets.";
   const bombMaxed = tower.type === "bomb" && (tower.level || 1) >= state.towerLevelCap;
   if (tower.type === "freeze") {
     upgradeText = "Upgrades: stronger slow + longer range.";
@@ -4721,7 +4661,7 @@ function updateFloorSpikes(dt) {
         }
         enemy.floorSpikeExposure = (enemy.floorSpikeExposure || 0) + dt;
         if (enemy.floorSpikeExposure >= burnDelay && !enemy.immuneHeat) {
-          enemy.burnTimer = Math.max(enemy.burnTimer, 1);
+          enemy.burnTimer = Math.max(enemy.burnTimer, 2);
           enemy.burnDps = Math.max(enemy.burnDps, burnDps);
         }
       }

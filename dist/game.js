@@ -4756,7 +4756,7 @@ function updateFloorSpikes(dt) {
         }
         enemy.floorSpikeExposure = (enemy.floorSpikeExposure || 0) + dt;
         if (enemy.floorSpikeExposure >= burnDelay && !enemy.immuneHeat) {
-          enemy.burnTimer = Math.max(enemy.burnTimer, 1);
+          enemy.burnTimer = Math.max(enemy.burnTimer, 2);
           enemy.burnDps = Math.max(enemy.burnDps, burnDps);
         }
       }
