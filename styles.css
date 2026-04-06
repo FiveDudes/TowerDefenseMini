@@ -103,6 +103,7 @@ body {
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 6px;
   margin-top: 6px;
+  align-items: start;
 }
 
 .game-column {
