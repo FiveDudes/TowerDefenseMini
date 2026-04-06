@@ -3047,7 +3047,7 @@ function handleClick(event) {
   }
 
   let selected = null;
-  const towersHere = state.towers.filter((tower) => Math.hypot(tower.x - snapped.x, tower.y - snapped.y) < 20);
+  const towersHere = state.towers.filter((tower) => Math.hypot(tower.x - x, tower.y - y) < 20);
   const selectableHere = towersHere.filter((tower) => !tower.isMini);
   if (state.placing) {
     if (state.placing === "wall") {
