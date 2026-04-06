@@ -1202,30 +1202,36 @@ function showAlert(title, message, pauseWave = false) {
   }
 }
 
+const waveUnlocks = [
+  { wave: 1, kind: "enemy", title: "Grunts", desc: "Basic frontline enemies.", value: "grunt" },
+  { wave: 2, kind: "enemy", title: "Speedy", desc: "Fast enemies that slip through gaps.", value: "speedy" },
+  { wave: 3, kind: "enemy", title: "Heavy", desc: "Slow, tanky targets.", value: "heavy" },
+  { wave: 4, kind: "enemy", title: "Shade", desc: "Hidden until revealed by Watch Towers or taps.", value: "stealth" },
+  { wave: 5, kind: "mutation", title: "Armored", desc: "Bomb and Laser break armor fastest.", value: "armored" },
+  { wave: 6, kind: "enemy", title: "Labrat", desc: "Tough experiment, immune to radiation.", value: "labrat" },
+  { wave: 7, kind: "enemy", title: "Flying", desc: "Dodges traps and mines.", value: "flying" },
+  { wave: 8, kind: "enemy", title: "Backstepper", desc: "Randomly steps backward to dodge shots.", value: "troll" },
+  { wave: 9, kind: "enemy", title: "Aegis", desc: "Shields nearby enemies from splash.", value: "aegis" },
+  { wave: 10, kind: "enemy", title: "Boss", desc: "First boss arrives. Massive HP.", value: "boss" },
+  { wave: 11, kind: "enemy", title: "Thief", desc: "Steals gold every few seconds.", value: "thief" },
+  { wave: 12, kind: "enemy", title: "Swarm", desc: "Spawns a sea of swarmlets.", value: "swarm" },
+  { wave: 13, kind: "enemy", title: "Buffer", desc: "Buffs and heals nearby enemies.", value: "buffer" },
+  { wave: 14, kind: "enemy", title: "Saboteur", desc: "Disables nearby traps and mines.", value: "saboteur" },
+  { wave: 15, kind: "enemy", title: "Diamond", desc: "Heavy armor and big HP.", value: "diamond" },
+  { wave: 16, kind: "enemy", title: "Brood Mother", desc: "Summons broods as it moves.", value: "broodMother" },
+  { wave: 17, kind: "mutation", title: "Dark Matter", desc: "Resists slow and poison effects.", value: "darkMatter" },
+  { wave: 18, kind: "enemy", title: "Chimera", desc: "Late-game hybrid menace.", value: "chimera" },
+];
+
 function handleWaveAlerts(wave) {
-  if (wave === 3) {
-    showAlert(
-      "Incoming Threats",
-      "<p>Shade enemies arrive on Wave 4.</p><p>Armored enemies arrive on Wave 5.</p><p>Build <strong>Watch Towers</strong> or <strong>tap shades</strong> to reveal them, then use <strong>Bomb</strong> and <strong>Laser</strong> to crack armor.</p>"
-    );
-  } else if (wave === 4) {
-    showAlert(
-      "Shade Wave",
-      "<p>Shade enemies are here.</p><p>Place <strong>Watch Towers</strong> or <strong>tap shades</strong> to reveal them.</p>",
-      true
-    );
-  } else if (wave === 5) {
-    showAlert(
-      "Armored Wave",
-      "<p>Armored enemies are here.</p><p>Use <strong>Bomb</strong> and <strong>Laser</strong> towers to break armor.</p>",
-      true
-    );
-  } else if (wave === 13) {
-    showAlert(
-      "Diamonds Incoming",
-      "<p>Diamond enemies arrive on Wave 15.</p><p>Prepare high damage and armor-breaking towers.</p>"
-    );
+  if (wave === 1) {
+    showAlert("Wave 1 Briefing", "<p><strong>Grunts</strong> arrive in Wave 1. Place basic towers early.</p>");
+    return;
   }
+  const unlocks = waveUnlocks.filter((entry) => entry.wave + 1 === wave);
+  if (unlocks.length === 0) return;
+  const lines = unlocks.map((entry) => `<p><strong>${entry.title}</strong>: ${entry.desc}</p>`);
+  showAlert("New Intel", lines.join(""));
 }
 
 function togglePauseWave() {
@@ -1263,33 +1269,33 @@ function spawnEnemy() {
     const bossIndex = Math.max(0, Math.floor(state.wave / 10) - 1);
     const bossTypes = ["boss_fast", "boss_pentagon", "boss_hexagon", "boss_diamond"];
     type = bossTypes[bossIndex % bossTypes.length];
-  } else if (roll < 0.1) {
+  } else if (roll < 0.1 && state.wave >= 2) {
     type = "speedy";
-  } else if (roll < 0.2) {
+  } else if (roll < 0.2 && state.wave >= 3) {
     type = "heavy";
-  } else if (roll < 0.26 && state.wave >= 6) {
+  } else if (roll < 0.26 && state.wave >= 7) {
     type = "flying";
-  } else if (roll < 0.3 && state.wave >= 8) {
+  } else if (roll < 0.3 && state.wave >= 9) {
     type = "aegis";
-  } else if (roll < 0.33 && state.wave >= 7) {
+  } else if (roll < 0.33 && state.wave >= 8) {
     type = "troll";
-  } else if (roll < 0.36 && state.wave >= 8) {
+  } else if (roll < 0.36 && state.wave >= 11) {
     type = "thief";
-  } else if (roll < 0.39 && state.wave >= 10) {
+  } else if (roll < 0.39 && state.wave >= 13) {
     type = "buffer";
-  } else if (roll < 0.42 && state.wave >= 12) {
+  } else if (roll < 0.42 && state.wave >= 14) {
     type = "saboteur";
-  } else if (roll < 0.45 && state.wave >= 12) {
+  } else if (roll < 0.45 && state.wave >= 16) {
     type = "broodMother";
   } else if (roll < 0.5 && state.wave >= 4) {
     type = "stealth";
-  } else if (roll < 0.54) {
+  } else if (roll < 0.54 && state.wave >= 6) {
     type = "labrat";
   } else if (roll < 0.6 && state.wave >= 15) {
     type = "diamond";
-  } else if (roll < 0.66 && state.wave >= 10) {
+  } else if (roll < 0.66 && state.wave >= 12) {
     type = "swarm";
-  } else if (roll < 0.68 && state.wave >= 25) {
+  } else if (roll < 0.68 && state.wave >= 18) {
     type = "chimera";
   }
   let armored = false;
@@ -1297,7 +1303,7 @@ function spawnEnemy() {
   let stealth = type === "stealth";
   const allowArmored = state.wave >= 5;
   const allowStealthRoll = state.wave >= 4;
-  const allowDarkMatter = state.wave >= 3;
+  const allowDarkMatter = state.wave >= 17;
   if (allowArmored && Math.random() < 0.18) armored = true;
   if (allowDarkMatter && Math.random() < 0.15) darkMatter = true;
   if (allowStealthRoll && Math.random() < 0.18) stealth = true;
@@ -7575,6 +7581,7 @@ const selectDifficulty = (difficulty) => {
   if (ui.gameOver) ui.gameOver.classList.add("hidden");
   recomputeGlobalPath();
   updateHud();
+  handleWaveAlerts(1);
 };
 if (titleScreen) {
   const buttons = titleScreen.querySelectorAll("[data-difficulty]");
