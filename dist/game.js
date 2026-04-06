@@ -4449,7 +4449,7 @@ function updateSpikeTower(tower, dt, stats) {
   };
   const applyLaneDamage = (limit, damage, slow, stun) => {
     const hits = collectSpikeContactHits(limit);
-    const hitTargets = hits.slice(0, Math.max(1, spikeCount));
+    const hitTargets = hits;
     for (const entry of hitTargets) {
       applySpikeEffects(entry.enemy, damage, slow, stun);
     }
@@ -4465,20 +4465,8 @@ function updateSpikeTower(tower, dt, stats) {
   if (phase === "idle") {
     if (state.enemies.length === 0) return;
     const limit = maxLen;
-    let nearby = false;
-    for (const enemy of state.enemies) {
-      if (enemy.hp <= 0) continue;
-      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
-        ensureEnemyPath(enemy);
-      }
-      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
-      const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
-      if (dist <= limit + getEnemyRadius(enemy)) {
-        nearby = true;
-        break;
-      }
-    }
-    if (!nearby) return;
+    const hits = collectSpikeContactHits(limit);
+    if (hits.length === 0) return;
     tower.spikePhase = "extend";
     tower.spikeProgress = 0;
     tower.spikeHit = false;
