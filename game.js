@@ -4651,6 +4651,7 @@ function updateFloorSpikes(dt) {
       continue;
     }
     if (burnDps > 0 && (phase === "extend" || phase === "hold")) {
+      spike.isFiery = true;
       for (const enemy of state.enemies) {
         if (enemy.hp <= 0) continue;
         if (enemy.flying) continue;
@@ -4707,11 +4708,13 @@ function updateFloorSpikes(dt) {
       continue;
     }
     if (phase === "retract") {
+      spike.isFiery = false;
       const next = Math.max(0, progress - dt * retractSpeed);
       spike.spikeProgress = next;
       if (next <= 0) {
         spike.spikePhase = "idle";
         spike.spikeHit = false;
+        spike.isFiery = false;
       }
     }
   }
@@ -5917,17 +5920,20 @@ function drawMines() {
     const base = data.color || "#f97316";
     const stroke = shadeColor(base, 0.55);
     const progress = tower.spikeProgress || 0;
+    const stats = getTowerStats(tower);
+    const burnDps = (stats && stats.floorSpikeBurnDps) || 0;
+    const fiery = burnDps > 0 || tower.isFiery;
     const height = 5 + 12 * progress;
-    ctx.fillStyle = shadeColor(base, 0.5);
+    ctx.fillStyle = shadeColor(base, fiery ? 0.8 : 0.5);
     ctx.beginPath();
     ctx.arc(tower.x, tower.y, 16, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = stroke;
+    ctx.strokeStyle = fiery ? "rgba(251, 113, 133, 0.85)" : stroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = shadeColor(base, 1.15);
+    ctx.fillStyle = shadeColor(base, fiery ? 1.45 : 1.15);
     const offsets = [-10, -5, 0, 5, 10];
     for (const ox of offsets) {
       for (const oy of offsets) {
@@ -5940,6 +5946,13 @@ function drawMines() {
         ctx.closePath();
         ctx.fill();
       }
+    }
+    if (fiery) {
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.75)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(tower.x, tower.y, 18 + Math.sin(performance.now() / 180) * 2, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 }
