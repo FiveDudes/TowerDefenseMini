@@ -498,7 +498,7 @@ const towerTypes = {
     slow: 0,
     laser: true,
     beamWidth: 8,
-    fireUnlockLevel: 1,
+    fireUnlockLevel: 3,
     fireDps: 9,
     fireDuration: 2.4,
     blocksPath: true,
