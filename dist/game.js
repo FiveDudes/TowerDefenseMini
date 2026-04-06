@@ -3376,10 +3376,25 @@ function fireLaser(tower, enemy, stats, range) {
   const damage = baseDamage * (stats.laserDamageMult || 1) * (stats.laserCannonMult || 1);
 
   const sourceType = tower.type;
+  const applyOpDebuffs = (target) => {
+    if (!target) return;
+    target.revealed = true;
+    target.stunTimer = Math.max(target.stunTimer || 0, 0.6);
+    target.slowTimer = Math.max(target.slowTimer || 0, 1.5);
+    target.slowFactor = Math.max(target.slowFactor || 0, 0.6);
+    target.dotTimer = Math.max(target.dotTimer || 0, 4);
+    target.dotDps = Math.max(target.dotDps || 0, 18);
+    target.burnTimer = Math.max(target.burnTimer || 0, 3);
+    target.burnDps = Math.max(target.burnDps || 0, 24);
+    target.embrittleTimer = Math.max(target.embrittleTimer || 0, 4);
+    target.embrittleMultiplier = Math.max(target.embrittleMultiplier || 1, 1.45);
+    target.radioactive = true;
+    target.darkMatter = false;
+  };
   for (const target of state.enemies) {
     if (target.hp <= 0) continue;
-    if (target.darkMatter && (sourceType === "laser" || sourceType === "op")) continue;
-    if (target.armored && sourceType !== "laser" && sourceType !== "bomb" && sourceType !== "op") continue;
+    if (sourceType !== "op" && target.darkMatter && sourceType === "laser") continue;
+    if (sourceType !== "op" && target.armored && sourceType !== "laser" && sourceType !== "bomb") continue;
     const pos = getEnemyPosition(target);
     const vx = pos.x - originX;
     const vy = pos.y - originY;
@@ -3397,6 +3412,9 @@ function fireLaser(tower, enemy, stats, range) {
         target.burnTimer = Math.max(target.burnTimer, stats.fireDuration);
         target.burnDps = Math.max(target.burnDps, stats.fireDps);
       }
+      if (sourceType === "op") {
+        applyOpDebuffs(target);
+      }
       if (stats.laserStun > 0) {
         target.stunTimer = Math.max(target.stunTimer || 0, stats.laserStun);
       }
@@ -3409,6 +3427,7 @@ function fireLaser(tower, enemy, stats, range) {
               applyArmorHit(splash);
             }
             applyDamage(splash, damage * 0.5);
+            applyOpDebuffs(splash);
             if (splash.hp <= 0) {
               handleEnemyDeath(splash);
             }
@@ -7913,6 +7932,8 @@ function setInfiniteFunds(enabled) {
   state.infiniteGold = enabled;
   if (enabled) {
     state.gold = 999999;
+  } else {
+    state.gold = 100;
   }
   updateHud();
 }
