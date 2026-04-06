@@ -1573,7 +1573,8 @@ function placeTower(type, x, y) {
   if (isOnPath(x, y) && !data.allowOnPath && !data.blocksPath) return;
   if ((type === "mine" || type === "floorSpike") && !isOnPath(x, y)) return;
   if (type === "drone" && isOnPath(x, y)) return;
-  if (data.blocksPath && isOnPath(x, y)) return;
+  if (data.blocksPath && isOnPath(x, y) && state.waveInProgress) return;
+  if (type === "wall" && isOnPath(x, y)) return;
   for (const tower of state.towers) {
     const towerData = towerTypes[tower.type];
     if (towerData && towerData.noGridlock) continue;
