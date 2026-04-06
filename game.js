@@ -7114,7 +7114,7 @@ if (ui.upgradeTo) {
     event.stopPropagation();
     const tower = state.selectedTower;
     if (!tower) return;
-    if (tower.type === "wall" || tower.type === "mine" || tower.type === "floorSpike") return;
+    if (tower.type === "wall" || tower.type === "mine") return;
     if (tower.type === "bomb" && (tower.level || 1) >= state.towerLevelCap) return;
     const current = tower.level || 1;
     const targetRaw = Number.parseInt((ui.upgradeTarget ? ui.upgradeTarget.value : undefined) || "1", 10);
