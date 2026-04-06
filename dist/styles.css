@@ -80,6 +80,10 @@ body {
   white-space: normal;
 }
 
+.topbar p:last-of-type {
+  display: none;
+}
+
 .hud {
   display: grid;
   gap: 4px;
@@ -120,8 +124,8 @@ body {
 .game-actions .btn-nuke {
   all: unset;
   display: inline-block;
-  width: 88px;
-  height: 88px;
+  width: 72px;
+  height: 72px;
   background: transparent url("assets/nuke-button-flat.png") center / contain no-repeat !important;
   cursor: pointer;
 }
