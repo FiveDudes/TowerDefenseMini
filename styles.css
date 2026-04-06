@@ -31,6 +31,8 @@ body {
   margin: 0 auto;
   padding: 6px;
   position: relative;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .topbar {
@@ -104,6 +106,7 @@ body {
   gap: 6px;
   margin-top: 6px;
   align-items: start;
+  height: calc(100vh - 120px);
 }
 
 .game-column {
@@ -199,6 +202,8 @@ canvas {
   flex-direction: column;
   gap: 10px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  height: 100%;
+  overflow-y: auto;
 }
 
 .panel-grid {

@@ -238,6 +238,7 @@ window.getTowerStats = getTowerStats;
 window.selectTarget = selectTarget;
 window.getNearestPathPoint = getNearestPathPoint;
 window.getSpikeDirection = getSpikeDirection;
+window.getSpikeDirections = getSpikeDirections;
 window.triggerSpikeTestExtend = triggerSpikeTestExtend;
 window.debugState = () => ({
   wave: state.wave,
@@ -979,16 +980,28 @@ function getNearestPathPoint(x, y) {
   return best ? { point: best, dist: bestDist } : null;
 }
 
-function getSpikeDirection(tower) {
+function getSpikeDirections(tower) {
+  const dirs = [];
+  const step = grid.size;
+  if (isOnPath(tower.x + step, tower.y)) dirs.push({ x: 1, y: 0 });
+  if (isOnPath(tower.x - step, tower.y)) dirs.push({ x: -1, y: 0 });
+  if (isOnPath(tower.x, tower.y + step)) dirs.push({ x: 0, y: 1 });
+  if (isOnPath(tower.x, tower.y - step)) dirs.push({ x: 0, y: -1 });
+  if (dirs.length > 0) return dirs;
   const nearest = getNearestPathPoint(tower.x, tower.y);
-  if (!nearest) return null;
+  if (!nearest) return [];
   const dx = nearest.point.x - tower.x;
   const dy = nearest.point.y - tower.y;
-  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return null;
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return [];
   if (Math.abs(dx) >= Math.abs(dy)) {
-    return { x: Math.sign(dx), y: 0 };
+    return [{ x: Math.sign(dx), y: 0 }];
   }
-  return { x: 0, y: Math.sign(dy) };
+  return [{ x: 0, y: Math.sign(dy) }];
+}
+
+function getSpikeDirection(tower) {
+  const dirs = getSpikeDirections(tower);
+  return dirs[0] || null;
 }
 
 function updateEncyclopedia() {
@@ -4379,9 +4392,9 @@ function getSpikeLaneHalfWidth() {
 function triggerSpikeTestExtend() {
   for (const tower of state.towers) {
     if (tower.type !== "spikeTower") continue;
-    const dir = getSpikeDirection(tower);
-    if (!dir) continue;
-    tower.spikeDir = dir;
+    const dirs = getSpikeDirections(tower);
+    if (dirs.length === 0) continue;
+    tower.spikeDirs = dirs;
     tower.spikePhase = "hold";
     tower.spikeProgress = 1;
     tower.spikeHoldTimer = 1.5;
@@ -4392,22 +4405,24 @@ function triggerSpikeTestExtend() {
 }
 
 function hasEnemyInSpikeLane(tower, range) {
-  const dir = tower.spikeDir || getSpikeDirection(tower);
-  if (!dir) return false;
+  const dirs = tower.spikeDirs || getSpikeDirections(tower);
+  if (dirs.length === 0) return false;
   const limit = range;
   const backAllowance = 0;
-  for (const enemy of state.enemies) {
-    if (enemy.hp <= 0) continue;
-    if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
-      ensureEnemyPath(enemy);
+  for (const dir of dirs) {
+    for (const enemy of state.enemies) {
+      if (enemy.hp <= 0) continue;
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+        ensureEnemyPath(enemy);
+      }
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+      const dx = enemy.x - tower.x;
+      const dy = enemy.y - tower.y;
+      const forward = dx * dir.x + dy * dir.y;
+      if (forward < backAllowance || forward > limit) continue;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= limit + getEnemyRadius(enemy)) return true;
     }
-    if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
-    const dx = enemy.x - tower.x;
-    const dy = enemy.y - tower.y;
-    const forward = dx * dir.x + dy * dir.y;
-    if (forward < backAllowance || forward > limit) continue;
-    const dist = Math.hypot(dx, dy);
-    if (dist <= limit + getEnemyRadius(enemy)) return true;
   }
   return false;
 }
@@ -4415,9 +4430,9 @@ function hasEnemyInSpikeLane(tower, range) {
 function updateSpikeTower(tower, dt, stats) {
   const data = stats ? stats.data : towerTypes.spikeTower;
   const maxLen = (stats && stats.spikeHitRange) || (stats && stats.spikeRange) || data.spikeRange || 32;
-  const dir = getSpikeDirection(tower);
-  if (!dir) return;
-  tower.spikeDir = dir;
+  const dirs = getSpikeDirections(tower);
+  if (dirs.length === 0) return;
+  tower.spikeDirs = dirs;
   const spikeDamage = (stats && stats.spikeDamage) || data.damage || 0;
   const spikeCount = (stats && stats.spikeCount) || 1;
   const spikeSlow = (stats && stats.spikeSlow) || 0;
@@ -4445,7 +4460,7 @@ function updateSpikeTower(tower, dt, stats) {
       enemy.slowFactor = Math.max(enemy.slowFactor || 0, slowFactor);
     }
   };
-  const collectLaneHits = (limit) => {
+  const collectLaneHits = (limit, dir) => {
     const hits = [];
     for (const enemy of state.enemies) {
       if (enemy.hp <= 0) continue;
@@ -4465,7 +4480,7 @@ function updateSpikeTower(tower, dt, stats) {
     hits.sort((a, b) => a.dist - b.dist);
     return hits;
   };
-  const collectSpikeContactHits = (limit) => {
+  const collectSpikeContactHits = (limit, dir) => {
     const hits = [];
     const sx = tower.x;
     const sy = tower.y;
@@ -4496,14 +4511,17 @@ function updateSpikeTower(tower, dt, stats) {
     hits.sort((a, b) => a.dist - b.dist);
     return hits;
   };
-  const applyLaneDamage = (limit, damage, slow, stun) => {
-    const hits = collectSpikeContactHits(limit);
+  const applyLaneDamage = (limit, damage, slow, stun, dir) => {
+    const hits = collectSpikeContactHits(limit, dir);
     const hitTargets = hits;
     for (const entry of hitTargets) {
       applySpikeEffects(entry.enemy, damage, slow, stun);
     }
     if (hitTargets.length > 0) {
-      tower.spikeContactLen = hitTargets[0].dist;
+      if (!tower.spikeContactLenMap) {
+        tower.spikeContactLenMap = {};
+      }
+      tower.spikeContactLenMap[`${dir.x},${dir.y}`] = hitTargets[0].dist;
     }
     if (drillCharge > 0 && hitTargets.length > 0) {
       tower.spikeDrillTarget = hitTargets[0].enemy;
@@ -4514,8 +4532,15 @@ function updateSpikeTower(tower, dt, stats) {
   if (phase === "idle") {
     if (state.enemies.length === 0) return;
     const limit = maxLen;
-    const hits = collectSpikeContactHits(limit);
-    if (hits.length === 0) return;
+    let anyHits = false;
+    for (const dir of dirs) {
+      const hits = collectSpikeContactHits(limit, dir);
+      if (hits.length > 0) {
+        anyHits = true;
+        break;
+      }
+    }
+    if (!anyHits) return;
     tower.spikePhase = "extend";
     tower.spikeProgress = 0;
     tower.spikeHit = false;
@@ -4527,16 +4552,21 @@ function updateSpikeTower(tower, dt, stats) {
     const next = Math.min(1, progress + dt / extendTime);
     tower.spikeProgress = next;
     const len = maxLen * next;
-    const hits = applyLaneDamage(len, spikeDamage, spikeSlow, spikeHold);
-    if (hits > 0 || next >= 1) {
-      tower.spikeHit = hits > 0;
+    let hitCount = 0;
+    for (const dir of dirs) {
+      hitCount += applyLaneDamage(len, spikeDamage, spikeSlow, spikeHold, dir);
+    }
+    if (hitCount > 0 || next >= 1) {
+      tower.spikeHit = hitCount > 0;
       tower.spikePhase = "hold";
       tower.spikeHoldTimer = holdTime;
     }
     return;
   }
   if (phase === "hold") {
-    applyLaneDamage(maxLen, 0, 0, 0);
+    for (const dir of dirs) {
+      applyLaneDamage(maxLen, 0, 0, 0, dir);
+    }
     tower.spikeHoldTimer = Math.max(0, (tower.spikeHoldTimer || 0) - dt);
     if (drillDps > 0 && tower.spikeDrillTarget && tower.spikeDrillTarget.hp > 0) {
       const target = tower.spikeDrillTarget;
@@ -4562,8 +4592,8 @@ function updateSpikeTower(tower, dt, stats) {
       tower.spikeHit = false;
       tower.spikeDrillTarget = null;
       tower.spikeDrillTimer = 0;
-      tower.spikeDir = null;
-      tower.spikeContactLen = null;
+      tower.spikeDirs = null;
+      tower.spikeContactLenMap = null;
     }
   }
 }
@@ -4863,8 +4893,8 @@ function isBlockedBySpike(enemy) {
     if (tower.type !== "spikeTower") continue;
     const progress = tower.spikeProgress || 0;
     if (progress <= 0) continue;
-    const dir = tower.spikeDir || getSpikeDirection(tower);
-    if (!dir) continue;
+    const dirs = tower.spikeDirs || getSpikeDirections(tower);
+    if (dirs.length === 0) continue;
     const stats = getTowerStats(tower);
     const range = (stats && stats.spikeHitRange)
       || (stats && stats.spikeRange)
@@ -4872,23 +4902,25 @@ function isBlockedBySpike(enemy) {
       || towerTypes.spikeTower.spikeRange
       || 32;
     const len = range * Math.min(1, Math.max(0, progress));
-    const sx = tower.x;
-    const sy = tower.y;
-    const ex = tower.x + dir.x * len;
-    const ey = tower.y + dir.y * len;
-    const lineLenSq = (ex - sx) * (ex - sx) + (ey - sy) * (ey - sy);
-    const px = enemy.x;
-    const py = enemy.y;
-    const dx = px - sx;
-    const dy = py - sy;
-    const forward = dx * dir.x + dy * dir.y;
-    if (forward < 0 || forward > len) continue;
-    const t = lineLenSq > 0 ? Math.max(0, Math.min(1, ((px - sx) * (ex - sx) + (py - sy) * (ey - sy)) / lineLenSq)) : 0;
-    const cx = sx + (ex - sx) * t;
-    const cy = sy + (ey - sy) * t;
-    const dist = Math.hypot(px - cx, py - cy);
-    if (dist <= radius) {
-      return true;
+    for (const dir of dirs) {
+      const sx = tower.x;
+      const sy = tower.y;
+      const ex = tower.x + dir.x * len;
+      const ey = tower.y + dir.y * len;
+      const lineLenSq = (ex - sx) * (ex - sx) + (ey - sy) * (ey - sy);
+      const px = enemy.x;
+      const py = enemy.y;
+      const dx = px - sx;
+      const dy = py - sy;
+      const forward = dx * dir.x + dy * dir.y;
+      if (forward < 0 || forward > len) continue;
+      const t = lineLenSq > 0 ? Math.max(0, Math.min(1, ((px - sx) * (ex - sx) + (py - sy) * (ey - sy)) / lineLenSq)) : 0;
+      const cx = sx + (ex - sx) * t;
+      const cy = sy + (ey - sy) * t;
+      const dist = Math.hypot(px - cx, py - cy);
+      if (dist <= radius) {
+        return true;
+      }
     }
   }
   return false;
@@ -6177,33 +6209,37 @@ function drawTowers() {
       ctx.strokeStyle = spikeStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(tower.x - 10, tower.y - 10, 20, 20);
-      const dir = tower.spikeDir || getSpikeDirection(tower);
-      if (dir) {
+      const dirs = tower.spikeDirs || getSpikeDirections(tower);
+      if (dirs.length > 0) {
         const stats = getTowerStats(tower);
         const maxLen = (stats && stats.spikeRange) || data.spikeRange || 32;
         const rawProgress = tower.spikeProgress || 0;
         const progress = rawProgress > 0 ? Math.max(rawProgress, 0.12) : 0;
-        let len = maxLen * progress;
-        if (tower.spikeContactLen && progress > 0) {
-          len = Math.min(len, tower.spikeContactLen);
-        }
-        const tipX = tower.x + dir.x * len;
-        const tipY = tower.y + dir.y * len;
+        const contactMap = tower.spikeContactLenMap || {};
         ctx.fillStyle = shadeColor(base, 1.1);
-        ctx.beginPath();
-        if (dir.x !== 0) {
-          const half = grid.size * 0.25;
-          ctx.moveTo(tower.x + dir.x * 10, tower.y - half);
-          ctx.lineTo(tower.x + dir.x * 10, tower.y + half);
-          ctx.lineTo(tipX, tipY);
-        } else {
-          const half = grid.size * 0.25;
-          ctx.moveTo(tower.x - half, tower.y + dir.y * 10);
-          ctx.lineTo(tower.x + half, tower.y + dir.y * 10);
-          ctx.lineTo(tipX, tipY);
+        for (const dir of dirs) {
+          let len = maxLen * progress;
+          const contact = contactMap[`${dir.x},${dir.y}`];
+          if (Number.isFinite(contact) && progress > 0) {
+            len = Math.min(len, contact);
+          }
+          const tipX = tower.x + dir.x * len;
+          const tipY = tower.y + dir.y * len;
+          ctx.beginPath();
+          if (dir.x !== 0) {
+            const half = grid.size * 0.25;
+            ctx.moveTo(tower.x + dir.x * 10, tower.y - half);
+            ctx.lineTo(tower.x + dir.x * 10, tower.y + half);
+            ctx.lineTo(tipX, tipY);
+          } else {
+            const half = grid.size * 0.25;
+            ctx.moveTo(tower.x - half, tower.y + dir.y * 10);
+            ctx.lineTo(tower.x + half, tower.y + dir.y * 10);
+            ctx.lineTo(tipX, tipY);
+          }
+          ctx.closePath();
+          ctx.fill();
         }
-        ctx.closePath();
-        ctx.fill();
       }
     } else if (tower.type === "op") {
       ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
