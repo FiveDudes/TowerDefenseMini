@@ -347,10 +347,11 @@ button:focus-visible {
   width: 100%;
   max-width: none;
   margin: 0;
+  justify-content: center;
 }
 
 .title-column .btn-small {
-  justify-content: center;
+  width: 100%;
 }
 
 .profile-layout {
@@ -705,7 +706,8 @@ kbd {
   border-radius: 18px;
   padding: 20px 22px;
   text-align: center;
-  max-width: 320px;
+  width: min(96vw, 1320px);
+  max-width: 1320px;
   box-shadow: 0 20px 50px rgba(2, 6, 23, 0.7);
   pointer-events: auto;
   position: relative;
@@ -728,8 +730,8 @@ kbd {
 
 .title-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(420px, 1.8fr) minmax(260px, 0.9fr);
+  gap: 18px;
   align-items: start;
   margin-top: 8px;
 }
@@ -738,6 +740,7 @@ kbd {
   display: grid;
   gap: 8px;
   align-content: start;
+  min-width: 0;
 }
 
 .column-label {
@@ -779,6 +782,7 @@ kbd {
 .map-grid {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .map-card {
