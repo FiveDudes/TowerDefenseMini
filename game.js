@@ -3135,7 +3135,6 @@ function fireProjectile(tower, enemy, stats) {
         clusterChildDamage: stats.bombClusterChildDamage || 0,
         clusterChildRadius: stats.bombClusterChildRadius || 0,
         age: 0,
-        spin: Math.random() * Math.PI * 2,
         spinSpeed: 12 + Math.random() * 8,
       });
     }
@@ -3550,7 +3549,6 @@ function updateProjectiles(dt) {
                 clusterChildDamage: 0,
                 clusterChildRadius: 0,
                 age: 0,
-                spin: Math.random() * Math.PI * 2,
                 spinSpeed: 12 + Math.random() * 8,
               });
             }
@@ -6917,7 +6915,7 @@ function drawProjectiles() {
       const angle = Math.atan2(vy, vx);
       ctx.save();
       ctx.translate(proj.x, proj.y);
-      ctx.rotate(angle + (proj.spin || 0) + (proj.age || 0) * (proj.spinSpeed || 0));
+      ctx.rotate(angle + (proj.age || 0) * (proj.spinSpeed || 0));
       if (grenadeImage.complete && grenadeImage.naturalWidth) {
         const size = 22;
         ctx.drawImage(grenadeImage, -size * 0.5, -size * 0.5, size, size);
