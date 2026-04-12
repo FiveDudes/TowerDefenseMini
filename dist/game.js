@@ -8088,11 +8088,11 @@ if (ui.tutorialModal) {
 }
 
 if (ui.loginButton) {
-  ui.loginButton.addEventListener("click", openLoginModal);
+  ui.loginButton.addEventListener("click", login);
 }
 
 if (ui.gameLoginButton) {
-  ui.gameLoginButton.addEventListener("click", openLoginModal);
+  ui.gameLoginButton.addEventListener("click", login);
 }
 
 if (ui.submitLogin) {
