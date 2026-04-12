@@ -55,11 +55,15 @@ sixSevenImage.src = "./assets/sixseven-six.gif";
 const appwriteApi = window.Appwrite || {};
 const appwriteClient = appwriteApi.Client ? new appwriteApi.Client() : null;
 const appwriteAccount = appwriteClient && appwriteApi.Account ? new appwriteApi.Account(appwriteClient) : null;
+const appwriteRealtimeClient = appwriteApi.Client ? new appwriteApi.Client() : null;
 const APPWRITE_ENDPOINT_KEY = "tdm_appwrite_endpoint";
 const APPWRITE_PROJECT_KEY = "tdm_appwrite_project";
 const APPWRITE_PROJECT_ID = "69db9f4c0018c3070ee8";
 const APPWRITE_ENDPOINT = "https://nyc.cloud.appwrite.io/v1";
 const APPWRITE_REDIRECT_URL = "https://towerdefensemini.appwrite.network/";
+const APPWRITE_REALTIME_ENDPOINT = "https://appwrite.io/v1";
+const APPWRITE_REALTIME_DATABASE_ID = localStorage.getItem("tdm_appwrite_realtime_database") || "";
+const APPWRITE_REALTIME_COLLECTION_ID = localStorage.getItem("tdm_appwrite_realtime_collection") || "";
 const PROFILE_NAME_KEY = "tdm_profile_name";
 const PROFILE_AVATAR_KEY = "tdm_profile_avatar";
 const PROFILE_MAX_WAVE_KEY = "tdm_profile_max_wave";
@@ -79,6 +83,11 @@ const profileState = {
   maxWave: Number(localStorage.getItem(PROFILE_MAX_WAVE_KEY) || 0),
   maxDamage: Number(localStorage.getItem(PROFILE_MAX_DAMAGE_KEY) || 0),
   mostTowers: Number(localStorage.getItem(PROFILE_MOST_TOWERS_KEY) || 0),
+};
+
+const leaderboardState = {
+  rows: [],
+  subscription: null,
 };
 
 const ui = {
@@ -115,6 +124,8 @@ const ui = {
   ],
   userWelcome: document.getElementById("user-welcome"),
   logoutButton: document.getElementById("logout-button"),
+  leaderboardStatus: document.getElementById("leaderboard-status"),
+  leaderboardList: document.getElementById("leaderboard-list"),
   profileModal: document.getElementById("profile-modal"),
   profileAvatarPreview: document.getElementById("profile-avatar-preview"),
   profileEmail: document.getElementById("profile-email"),
@@ -238,6 +249,7 @@ for (const requiredId of ["easy-btn", "medium-btn", "hard-btn", "tutorial-btn"])
 }
 syncLoginButtons();
 void refreshLoginState();
+initLeaderboardRealtime();
 
 const buildButtons = {
   watch: ui.buildWatch,
@@ -843,6 +855,98 @@ function persistProfileState() {
   localStorage.setItem(PROFILE_MAX_WAVE_KEY, String(profileState.maxWave || 0));
   localStorage.setItem(PROFILE_MAX_DAMAGE_KEY, String(profileState.maxDamage || 0));
   localStorage.setItem(PROFILE_MOST_TOWERS_KEY, String(profileState.mostTowers || 0));
+}
+
+function getLeaderboardName(entry) {
+  return String(entry?.name || entry?.playerName || entry?.username || entry?.email || "Unknown");
+}
+
+function getLeaderboardScore(entry) {
+  const value = Number(entry?.score ?? entry?.maxWave ?? entry?.wave ?? entry?.damage ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function renderLeaderboard(rows = leaderboardState.rows) {
+  if (ui.leaderboardStatus) {
+    ui.leaderboardStatus.textContent = leaderboardState.subscription
+      ? "Realtime connected."
+      : "Waiting for Realtime updates.";
+  }
+  if (!ui.leaderboardList) return;
+  ui.leaderboardList.innerHTML = "";
+  const sorted = [...rows].sort((a, b) => getLeaderboardScore(b) - getLeaderboardScore(a)).slice(0, 5);
+  if (sorted.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No leaderboard entries yet.";
+    ui.leaderboardList.appendChild(item);
+    return;
+  }
+  for (const entry of sorted) {
+    const item = document.createElement("li");
+    const name = getLeaderboardName(entry);
+    const score = getLeaderboardScore(entry);
+    const subLabel = entry?.wave !== undefined ? `Wave ${entry.wave}` : entry?.damage !== undefined ? `Damage ${Math.round(entry.damage || 0)}` : `Score ${score}`;
+    item.innerHTML = `<strong>${name}</strong><span>${subLabel}</span>`;
+    ui.leaderboardList.appendChild(item);
+  }
+}
+
+function updateLeaderboardUI(payload) {
+  if (!payload) return;
+  const id = String(payload.$id || payload.id || getLeaderboardName(payload));
+  const nextRow = { ...payload, id };
+  const existingIndex = leaderboardState.rows.findIndex((row) => String(row.id || row.$id || "") === id);
+  if (existingIndex >= 0) {
+    leaderboardState.rows[existingIndex] = nextRow;
+  } else {
+    leaderboardState.rows.unshift(nextRow);
+  }
+  leaderboardState.rows = leaderboardState.rows
+    .filter(Boolean)
+    .sort((a, b) => getLeaderboardScore(b) - getLeaderboardScore(a))
+    .slice(0, 20);
+  renderLeaderboard();
+}
+
+function subscribeLeaderboardRealtime() {
+  if (!appwriteRealtimeClient || !appwriteApi.Client) {
+    leaderboardState.subscription = null;
+    renderLeaderboard([]);
+    return;
+  }
+  if (!APPWRITE_REALTIME_DATABASE_ID || !APPWRITE_REALTIME_COLLECTION_ID) {
+    leaderboardState.subscription = null;
+    renderLeaderboard([]);
+    if (ui.leaderboardStatus) {
+      ui.leaderboardStatus.textContent = "Set leaderboard database and collection ids to enable Realtime.";
+    }
+    return;
+  }
+  try {
+    appwriteRealtimeClient.setEndpoint(APPWRITE_REALTIME_ENDPOINT).setProject(APPWRITE_PROJECT_ID);
+    const channel = `databases.${APPWRITE_REALTIME_DATABASE_ID}.collections.${APPWRITE_REALTIME_COLLECTION_ID}.documents`;
+    leaderboardState.subscription = appwriteRealtimeClient.subscribe(channel, (response) => {
+      if (response?.payload) {
+        updateLeaderboardUI(response.payload);
+      }
+      if (response?.events && response.events.includes("databases.*.collections.*.documents.*.create")) {
+        updateLeaderboardUI(response.payload);
+      }
+    });
+    if (ui.leaderboardStatus) {
+      ui.leaderboardStatus.textContent = "Realtime connected.";
+    }
+  } catch (error) {
+    leaderboardState.subscription = null;
+    if (ui.leaderboardStatus) {
+      ui.leaderboardStatus.textContent = `Realtime unavailable: ${error?.message || error}`;
+    }
+  }
+}
+
+function initLeaderboardRealtime() {
+  renderLeaderboard([]);
+  subscribeLeaderboardRealtime();
 }
 
 function syncProfileModal() {

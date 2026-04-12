@@ -354,6 +354,40 @@ button:focus-visible {
   width: 100%;
 }
 
+.leaderboard-card {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(52, 152, 219, 0.35);
+  border-radius: 14px;
+  background: rgba(0, 20, 40, 0.55);
+  text-align: left;
+}
+
+.leaderboard-status {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.leaderboard-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.leaderboard-list li {
+  display: grid;
+  gap: 2px;
+}
+
+.leaderboard-list strong {
+  color: #dff2ff;
+}
+
 .profile-layout {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
