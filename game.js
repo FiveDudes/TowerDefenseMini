@@ -59,7 +59,7 @@ const APPWRITE_ENDPOINT_KEY = "tdm_appwrite_endpoint";
 const APPWRITE_PROJECT_KEY = "tdm_appwrite_project";
 const APPWRITE_PROJECT_ID = "69db9f4c0018c3070ee8";
 const APPWRITE_ENDPOINT = "https://nyc.cloud.appwrite.io/v1";
-const APPWRITE_REDIRECT_URL = "https://appwrite.network";
+const APPWRITE_REDIRECT_URL = "https://towerdefensemini.appwrite.network/";
 const loginState = {
   email: "",
   loggedIn: false,
