@@ -6464,12 +6464,30 @@ function drawTowers() {
       }
       if (tower.type !== "trap" && tower.type !== "laser") {
         ctx.fillStyle = shadeColor(base, 0.6);
-        const barrelWidth = 6;
-        const barrelLen = 12;
+        const projectileWidths = {
+          watch: 2,
+          freeze: 4,
+          drone: 4,
+          bomb: 6,
+          laser: 3,
+          dart: 2,
+          factory: 4,
+          flame: 5,
+          spikeTower: 4,
+          secret: 3,
+          op: 6,
+        };
+        const barrelWidth = (projectileWidths[tower.type] || 3) + 3;
+        const barrelLen = tower.type === "bomb" ? 15 : 12;
         const barrelInset = 16;
         ctx.fillRect(barrelInset, -barrelWidth / 2, barrelLen, barrelWidth);
         ctx.fillStyle = shadeColor(base, 0.75);
         ctx.fillRect(barrelInset + barrelLen - 3, -barrelWidth / 2, 3, barrelWidth);
+      } else if (tower.type === "laser") {
+        ctx.fillStyle = shadeColor(base, 0.6);
+        ctx.fillRect(10, -4, 14, 8);
+        ctx.fillStyle = shadeColor(base, 0.75);
+        ctx.fillRect(20, -4, 4, 8);
       }
       ctx.restore();
     }
