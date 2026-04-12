@@ -57,12 +57,13 @@ const appwriteClient = appwriteApi.Client ? new appwriteApi.Client() : null;
 const appwriteAccount = appwriteClient && appwriteApi.Account ? new appwriteApi.Account(appwriteClient) : null;
 const APPWRITE_ENDPOINT_KEY = "tdm_appwrite_endpoint";
 const APPWRITE_PROJECT_KEY = "tdm_appwrite_project";
+const APPWRITE_PROJECT_ID = "69db9f4c0018c3070ee8";
 const loginState = {
   email: "",
   loggedIn: false,
   loading: false,
   endpoint: localStorage.getItem(APPWRITE_ENDPOINT_KEY) || "https://cloud.appwrite.io/v1",
-  project: localStorage.getItem(APPWRITE_PROJECT_KEY) || "",
+  project: APPWRITE_PROJECT_ID,
 };
 
 const ui = {
@@ -91,8 +92,8 @@ const ui = {
   loginPassword: document.getElementById("login-password"),
   submitLogin: document.getElementById("submit-login"),
   closeLogin: document.getElementById("close-login"),
-  loginBtn: document.getElementById("login-btn"),
-  gameLoginBtn: document.getElementById("game-login-btn"),
+  loginButton: document.getElementById("login-button"),
+  gameLoginButton: document.getElementById("game-login-button"),
   tutorialModal: document.getElementById("tutorial-modal"),
   openTutorial: document.getElementById("tutorial-btn"),
   closeTutorial: document.getElementById("close-tutorial"),
@@ -766,11 +767,11 @@ function setLoginStatus(message) {
 }
 
 function syncLoginButtons() {
-  if (ui.loginBtn) ui.loginBtn.textContent = loginState.loggedIn ? "Logged In" : "Continue with Google";
-  if (ui.gameLoginBtn) ui.gameLoginBtn.textContent = loginState.loggedIn ? "Logged In" : "Google";
+  if (ui.loginButton) ui.loginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
+  if (ui.gameLoginButton) ui.gameLoginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
   if (ui.submitLogin) ui.submitLogin.disabled = loginState.loading;
-  if (ui.loginBtn) ui.loginBtn.disabled = loginState.loading;
-  if (ui.gameLoginBtn) ui.gameLoginBtn.disabled = loginState.loading;
+  if (ui.loginButton) ui.loginButton.disabled = loginState.loading;
+  if (ui.gameLoginButton) ui.gameLoginButton.disabled = loginState.loading;
 }
 
 function configureAppwriteClient() {
@@ -797,13 +798,7 @@ async function refreshLoginState() {
 }
 
 function openLoginModal() {
-  if (!ui.loginModal) return;
-  if (ui.loginEndpoint) ui.loginEndpoint.value = loginState.endpoint || "";
-  if (ui.loginProject) ui.loginProject.value = loginState.project || "";
-  setLoginStatus(loginState.loggedIn
-    ? `Logged in as ${loginState.email || "Google user"}.`
-    : "Enter your Appwrite endpoint and project ID, then continue with Google.");
-  ui.loginModal.classList.remove("hidden");
+  void submitLogin();
 }
 
 function closeLoginModal() {
@@ -815,8 +810,8 @@ async function submitLogin() {
     setLoginStatus("Appwrite SDK is not available.");
     return;
   }
-  const endpoint = (ui.loginEndpoint ? ui.loginEndpoint.value.trim() : "") || loginState.endpoint;
-  const project = (ui.loginProject ? ui.loginProject.value.trim() : "") || loginState.project;
+  const endpoint = loginState.endpoint || "https://cloud.appwrite.io/v1";
+  const project = APPWRITE_PROJECT_ID;
   if (!endpoint || !project) {
     setLoginStatus("Endpoint and project ID are required.");
     return;
@@ -832,7 +827,8 @@ async function submitLogin() {
     configureAppwriteClient();
     const redirectUrl = `${window.location.origin}${window.location.pathname}`;
     const provider = appwriteApi.OAuthProvider ? appwriteApi.OAuthProvider.Google : "google";
-    await appwriteAccount.createOAuth2Session(provider, redirectUrl, redirectUrl, []);
+    const account = appwriteAccount;
+    await account.createOAuth2Session(provider, redirectUrl, redirectUrl, []);
   } catch (error) {
     loginState.loggedIn = false;
     setLoginStatus(`Login failed: ${error?.message || error}`);
@@ -8083,14 +8079,12 @@ if (ui.tutorialModal) {
   });
 }
 
-if (ui.loginBtn) {
-  ui.loginBtn.addEventListener("click", openLoginModal);
-  ui.loginBtn.addEventListener("pointerdown", openLoginModal);
+if (ui.loginButton) {
+  ui.loginButton.addEventListener("click", openLoginModal);
 }
 
-if (ui.gameLoginBtn) {
-  ui.gameLoginBtn.addEventListener("click", openLoginModal);
-  ui.gameLoginBtn.addEventListener("pointerdown", openLoginModal);
+if (ui.gameLoginButton) {
+  ui.gameLoginButton.addEventListener("click", openLoginModal);
 }
 
 if (ui.submitLogin) {
