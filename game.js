@@ -4935,6 +4935,15 @@ function spawnBroodlets(origin, count) {
   const pathPoints = (origin.path && origin.path.length > 0)
     ? origin.path
     : (fallbackPaths[pathGroup] || fallbackPaths[0] || []);
+  if (!pathPoints || pathPoints.length < 2) return;
+  const originIndex = Math.max(0, Math.min(origin.pathIndex || 0, pathPoints.length - 2));
+  const current = pathPoints[originIndex];
+  const next = pathPoints[originIndex + 1];
+  const dx = next.x - current.x;
+  const dy = next.y - current.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const tangent = { x: dx / len, y: dy / len };
+  const normal = { x: -tangent.y, y: tangent.x };
   for (let i = 0; i < count; i += 1) {
     const brood = createEnemy("swarmlet", {
       armored: false,
@@ -4942,11 +4951,16 @@ function spawnBroodlets(origin, count) {
       stealth: false,
       pathGroup,
     });
-    const offset = { x: (Math.random() - 0.5) * 22, y: (Math.random() - 0.5) * 22 };
-    brood.x = origin.x + offset.x;
-    brood.y = origin.y + offset.y;
+    const forward = 12 + Math.random() * 10;
+    const lateral = (Math.random() - 0.5) * 18;
+    const offset = {
+      x: tangent.x * forward + normal.x * lateral,
+      y: tangent.y * forward + normal.y * lateral,
+    };
+    brood.x = current.x + offset.x;
+    brood.y = current.y + offset.y;
     brood.path = pathPoints;
-    brood.pathIndex = Math.max(0, Math.min(origin.pathIndex || 0, Math.max(0, pathPoints.length - 1)));
+    brood.pathIndex = originIndex;
     brood.pathOffset = offset;
     state.enemies.push(brood);
   }
