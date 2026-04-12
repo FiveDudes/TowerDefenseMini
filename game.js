@@ -1286,7 +1286,7 @@ function chooseOpenSpawnPathGroup() {
 
 function spawnEnemy() {
   const pathGroup = chooseOpenSpawnPathGroup();
-  if (pathGroup === null) return false;
+  const spawnGroup = Number.isFinite(pathGroup) ? pathGroup : 0;
   const isBossWave = state.wave % 10 === 0;
   const roll = Math.random();
   let type = "grunt";
@@ -1372,7 +1372,7 @@ function spawnEnemy() {
     state.waveHasSpawnedNonSpeedy = true;
   }
   registerEnemyInEncyclopedia(type, armored, darkMatter, stealth);
-  state.enemies.push(createEnemy(type, { armored, darkMatter, stealth, pathGroup }));
+  state.enemies.push(createEnemy(type, { armored, darkMatter, stealth, pathGroup: spawnGroup }));
   return true;
 }
 
