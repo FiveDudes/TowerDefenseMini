@@ -513,6 +513,7 @@ function getWallPathSides(x, y) {
 }
 
 const towerTypes = (window.TDMData && window.TDMData.towers) ? window.TDMData.towers : {};
+const enemyDefinitions = (window.TDMData && window.TDMData.enemies) ? window.TDMData.enemies : {};
 const enemyRuntime = window.TDMEnemyRuntime || {};
 const enemyRuntimeDeps = {
   state,
@@ -521,6 +522,7 @@ const enemyRuntimeDeps = {
   getActivePaths,
   isBossType,
   coalesce,
+  getEnemyDefinition: (type) => enemyDefinitions[type] || null,
 };
 const createEnemy = (type, options = {}) => enemyRuntime.createEnemy(enemyRuntimeDeps, type, options);
 const getEnemyPosition = (enemy) => enemyRuntime.getEnemyPosition(enemy);
@@ -1356,6 +1358,22 @@ function allocateEnemyPackId() {
   return nextId;
 }
 
+function getEnemyDefinition(type) {
+  return enemyDefinitions[type] || null;
+}
+
+function invokeEnemyHook(enemy, hookName, payload = {}) {
+  const definition = enemy && getEnemyDefinition(enemy.type);
+  const hook = definition && definition[hookName];
+  if (typeof hook !== "function") return false;
+  hook({
+    enemy,
+    state,
+    ...payload,
+  });
+  return true;
+}
+
 function findBlockingEnemy(enemy, nextX, nextY) {
   const enemyProgress = getEnemyProgress(enemy);
   let blocker = null;
@@ -1910,43 +1928,17 @@ function spawnEnemy() {
     darkMatter = false;
   }
   const packId = type === "broodMother" ? allocateEnemyPackId() : undefined;
-  if (type === "swarm") {
-    state.waveHasSpawnedNonSpeedy = true;
-    registerEnemyInEncyclopedia(type, armored, darkMatter);
-    const paths = getActivePaths();
-    const spawnGroup = Number.isFinite(pathGroup) ? pathGroup : 0;
-    const pathPoints = paths[spawnGroup] || paths[0];
-    const start = pathPoints && pathPoints[0] ? pathPoints[0] : { x: 0, y: 0 };
-    const next = pathPoints && pathPoints[1] ? pathPoints[1] : { x: start.x + 1, y: start.y };
-    const dx = next.x - start.x;
-    const dy = next.y - start.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const tangent = { x: dx / len, y: dy / len };
-    const normal = { x: -tangent.y, y: tangent.x };
-    const spacing = 10;
-    const lateral = 10;
-    for (let i = 0; i < 20; i += 1) {
-      const along = -i * spacing;
-      const side = (i % 2 === 0 ? 1 : -1) * (Math.random() * lateral);
-      const pathOffset = {
-        x: tangent.x * along + normal.x * side,
-        y: tangent.y * along + normal.y * side,
-      };
-      state.enemies.push(createEnemy("swarmlet", {
-        armored: false,
-        darkMatter: false,
-        stealth: false,
-        pathGroup: spawnGroup,
-        pathOffset,
-      }));
-    }
-    return true;
-  }
   if (type !== "speedy") {
     state.waveHasSpawnedNonSpeedy = true;
   }
   registerEnemyInEncyclopedia(type, armored, darkMatter, stealth);
-  state.enemies.push(createEnemy(type, { armored, darkMatter, stealth, pathGroup, packId }));
+  const enemy = createEnemy(type, { armored, darkMatter, stealth, pathGroup, packId });
+  state.enemies.push(enemy);
+  invokeEnemyHook(enemy, "onSpawn", {
+    createEnemy,
+    getActivePaths,
+    allocateEnemyPackId,
+  });
   return true;
 }
 
@@ -3887,6 +3879,22 @@ function fireLaser(tower, enemy, stats, range) {
 }
 
 function fireFlameCone(tower, enemy, stats) {
+  const flame = towerTypes.flame;
+  if (flame && typeof flame.onFire === "function") {
+    flame.onFire({
+      tower,
+      enemy,
+      stats,
+      state,
+      getTowerMuzzlePoint,
+      getEnemyPosition,
+      applyDamage,
+      applyArmorHit,
+      spawnNukeEmbers,
+      performance,
+    });
+    return;
+  }
   const { data } = stats;
   const muzzle = getTowerMuzzlePoint(tower, stats);
   const originX = muzzle.x;
@@ -5490,47 +5498,6 @@ function updateSpikeTowers(dt) {
   }
 }
 
-function spawnBroodlets(origin, count) {
-  const pathGroup = Number.isFinite(origin.pathGroup) ? origin.pathGroup : 0;
-  const packId = Number.isFinite(origin.packId) ? origin.packId : allocateEnemyPackId();
-  if (!Number.isFinite(origin.packId)) {
-    origin.packId = packId;
-  }
-  const fallbackPaths = getActivePaths();
-  const pathPoints = (origin.path && origin.path.length > 0)
-    ? origin.path
-    : (fallbackPaths[pathGroup] || fallbackPaths[0] || []);
-  if (!pathPoints || pathPoints.length < 2) return;
-  const originIndex = Math.max(0, Math.min(origin.pathIndex || 0, pathPoints.length - 2));
-  const current = pathPoints[originIndex];
-  const next = pathPoints[originIndex + 1];
-  const dx = next.x - current.x;
-  const dy = next.y - current.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const tangent = { x: dx / len, y: dy / len };
-  const normal = { x: -tangent.y, y: tangent.x };
-  for (let i = 0; i < count; i += 1) {
-    const brood = createEnemy("swarmlet", {
-      armored: false,
-      darkMatter: false,
-      stealth: false,
-      pathGroup,
-      packId,
-    });
-    const forward = 18 + Math.random() * 10 + i * 2;
-    const lateral = (Math.random() - 0.5) * 10;
-    brood.x = origin.x + tangent.x * forward + normal.x * lateral;
-    brood.y = origin.y + tangent.y * forward + normal.y * lateral;
-    brood.path = pathPoints;
-    brood.pathIndex = Math.min(originIndex + 1, pathPoints.length - 2);
-    brood.pathOffset = {
-      x: normal.x * lateral,
-      y: normal.y * lateral,
-    };
-    state.enemies.push(brood);
-  }
-}
-
 function updateEnemies(dt) {
   for (const enemy of state.enemies) {
     enemy.umbrellaShielded = false;
@@ -5632,7 +5599,12 @@ function updateEnemies(dt) {
         enemy.sabotageTimer = 2.2;
       }
     }
-    if (enemy.broodMother) {
+    if (!invokeEnemyHook(enemy, "onTick", {
+      dt,
+      getActivePaths,
+      createEnemy,
+      allocateEnemyPackId,
+    }) && enemy.broodMother) {
       enemy.broodTimer = Math.max(0, (enemy.broodTimer || 0) - dt);
       if (enemy.broodTimer <= 0) {
         spawnBroodlets(enemy, 3);
@@ -5966,6 +5938,10 @@ function applyDamage(enemy, amount) {
   const scaled = amount * multiplier * buffMult;
   const applied = Math.max(0, Math.min(enemy.hp, scaled));
   if (applied > 0) {
+    invokeEnemyHook(enemy, "onDamage", {
+      amount: applied,
+      sourceAmount: amount,
+    });
     if (enemy.stealth) {
       enemy.stealth = false;
       enemy.revealed = true;

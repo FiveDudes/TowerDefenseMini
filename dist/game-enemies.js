@@ -1,6 +1,7 @@
 (function attachEnemyRuntime(globalScope) {
   function createEnemy(deps, type, options = {}) {
-    const { state, towerTypes, grid, getActivePaths, isBossType, coalesce } = deps;
+    const { state, towerTypes, grid, getActivePaths, isBossType, coalesce, getEnemyDefinition } = deps;
+    const definition = typeof getEnemyDefinition === "function" ? getEnemyDefinition(type) : null;
     const isBoss = isBossType(type);
     const isFast = type === "speedy" || type === "boss_fast";
     const isSwarmlet = type === "swarmlet";
@@ -140,6 +141,7 @@
       chimera: isChimera,
       broodMother: isBroodMother,
       broodTimer: isBroodMother ? 2.4 : 0,
+      definition,
     };
     if (enemy.armored) {
       enemy.armorHits = 0;
