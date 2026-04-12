@@ -4,6 +4,7 @@
     attack: { kind: "tone", wave: "triangle", frequency: 300, duration: 0.04, gain: 0.018, attack: 0.002, release: 0.035, cooldown: 0.02 },
     freezeAura: { kind: "tone", wave: "triangle", frequency: 170, duration: 0.22, gain: 0.012, attack: 0.02, release: 0.2, cooldown: 0.18, endFrequency: 150 },
     explosion: { kind: "explosion", duration: 0.42, gain: 0.11, attack: 0.002, release: 0.42, cooldown: 0.05, boomFrequency: 92, tailFrequency: 46, filterFrequency: 980 },
+    bombExplosion: { kind: "explosion", duration: 0.72, gain: 0.075, attack: 0.002, release: 0.72, cooldown: 0.08, boomFrequency: 70, tailFrequency: 26, filterFrequency: 760 },
     death: { kind: "tone", wave: "sawtooth", frequency: 160, duration: 0.09, gain: 0.022, attack: 0.003, release: 0.08, cooldown: 0.03 },
     nukeLaunch: { kind: "explosion", duration: 0.8, gain: 0.14, attack: 0.005, release: 0.8, cooldown: 0.5, boomFrequency: 60, tailFrequency: 26, filterFrequency: 700 },
     nuke: { kind: "explosion", duration: 2.2, gain: 0.24, attack: 0.001, release: 2.2, cooldown: 1.4, boomFrequency: 44, tailFrequency: 14, filterFrequency: 480 },

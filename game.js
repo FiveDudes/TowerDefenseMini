@@ -3510,7 +3510,7 @@ function updateProjectiles(dt) {
         if (proj.sourceType === "bomb" || proj.kind === "rocket") {
           pushShockwave(targetPos.x, targetPos.y, proj.splashRadius, "rgba(248, 113, 113, 0.5)");
         }
-        playAttackImpactSound("explosion");
+        playAttackImpactSound(proj.sourceType === "bomb" || proj.kind === "rocket" ? "bombExplosion" : "explosion");
         for (const enemy of state.enemies) {
           if (enemy.hp <= 0) continue;
           if (enemy.armored && proj.sourceType !== "bomb" && !proj.armorPierce) continue;
@@ -7038,8 +7038,8 @@ function drawProjectiles() {
 function drawExplosions() {
   for (const explosion of state.explosions) {
     const alpha = Math.min(1, explosion.ttl * 3);
-    ctx.strokeStyle = explosion.color;
-    ctx.lineWidth = explosion.shockwave ? 6 : 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = explosion.shockwave ? 6 : 4;
     ctx.globalAlpha = alpha;
     ctx.beginPath();
     ctx.arc(explosion.x, explosion.y, explosion.radius * (1 - explosion.ttl * 0.6), 0, Math.PI * 2);
