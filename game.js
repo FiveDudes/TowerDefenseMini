@@ -96,6 +96,8 @@ const ui = {
   closeLogin: document.getElementById("close-login"),
   loginButton: document.getElementById("login-button"),
   gameLoginButton: document.getElementById("game-login-button"),
+  userWelcome: document.getElementById("user-welcome"),
+  logoutButton: document.getElementById("logout-button"),
   tutorialModal: document.getElementById("tutorial-modal"),
   openTutorial: document.getElementById("tutorial-btn"),
   closeTutorial: document.getElementById("close-tutorial"),
@@ -775,6 +777,22 @@ function syncLoginButtons() {
   if (ui.submitLogin) ui.submitLogin.disabled = locked;
   if (ui.loginButton) ui.loginButton.disabled = locked;
   if (ui.gameLoginButton) ui.gameLoginButton.disabled = locked;
+  if (ui.logoutButton) ui.logoutButton.disabled = loginState.loading;
+  if (ui.userWelcome) {
+    ui.userWelcome.classList.toggle("hidden", !loginState.loggedIn);
+    ui.userWelcome.textContent = loginState.loggedIn
+      ? `WELCOME, COMMANDER ${String(loginState.email || "Google user").toUpperCase()}`
+      : "";
+  }
+  if (ui.logoutButton) {
+    ui.logoutButton.classList.toggle("hidden", !loginState.loggedIn);
+  }
+  if (ui.loginButton) {
+    ui.loginButton.style.display = loginState.loggedIn ? "none" : "";
+  }
+  if (ui.gameLoginButton) {
+    ui.gameLoginButton.style.display = loginState.loggedIn ? "none" : "";
+  }
 }
 
 function configureAppwriteClient() {
@@ -786,6 +804,8 @@ function configureAppwriteClient() {
 
 async function refreshLoginState() {
   if (!appwriteAccount || !configureAppwriteClient()) {
+    loginState.loggedIn = false;
+    loginState.email = "";
     syncLoginButtons();
     return;
   }
@@ -796,6 +816,7 @@ async function refreshLoginState() {
     setLoginStatus(`Signed in as ${loginState.email}.`);
   } catch {
     loginState.loggedIn = false;
+    loginState.email = "";
   }
   syncLoginButtons();
 }
@@ -844,6 +865,20 @@ async function submitLogin() {
 
 function login() {
   return appwriteAccount.createOAuth2Session("google", APPWRITE_REDIRECT_URL, APPWRITE_REDIRECT_URL);
+}
+
+async function logout() {
+  if (!appwriteAccount) return;
+  try {
+    await appwriteAccount.deleteSession("current");
+  } catch (error) {
+    console.error("Logout failed:", error?.message || error);
+    return;
+  }
+  loginState.loggedIn = false;
+  loginState.email = "";
+  syncLoginButtons();
+  window.location.reload();
 }
 
 function notificationsSuppressed() {
@@ -8093,6 +8128,10 @@ if (ui.loginButton) {
 
 if (ui.gameLoginButton) {
   ui.gameLoginButton.addEventListener("click", login);
+}
+
+if (ui.logoutButton) {
+  ui.logoutButton.addEventListener("click", logout);
 }
 
 if (ui.submitLogin) {
