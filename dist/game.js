@@ -109,7 +109,10 @@ const ui = {
   closeLogin: document.getElementById("close-login"),
   loginButton: document.getElementById("login-button"),
   gameLoginButton: document.getElementById("game-login-button"),
-  profileButton: document.getElementById("profile-button"),
+  profileButtons: [
+    document.getElementById("profile-button-title"),
+    document.getElementById("profile-button-top"),
+  ],
   userWelcome: document.getElementById("user-welcome"),
   logoutButton: document.getElementById("logout-button"),
   profileModal: document.getElementById("profile-modal"),
@@ -929,7 +932,9 @@ function syncLoginButtons() {
   if (ui.loginButton) ui.loginButton.disabled = locked;
   if (ui.gameLoginButton) ui.gameLoginButton.disabled = locked;
   if (ui.logoutButton) ui.logoutButton.disabled = loginState.loading;
-  if (ui.profileButton) ui.profileButton.classList.toggle("hidden", !loginState.loggedIn);
+  for (const button of ui.profileButtons || []) {
+    if (button) button.classList.toggle("hidden", !loginState.loggedIn);
+  }
   if (ui.userWelcome) {
     ui.userWelcome.classList.toggle("hidden", !loginState.loggedIn);
     const displayName = profileState.name || loginState.email || "Google user";
@@ -8291,8 +8296,10 @@ if (ui.gameLoginButton) {
   ui.gameLoginButton.addEventListener("click", login);
 }
 
-if (ui.profileButton) {
-  ui.profileButton.addEventListener("click", openProfileModal);
+for (const button of ui.profileButtons || []) {
+  if (button) {
+    button.addEventListener("click", openProfileModal);
+  }
 }
 
 if (ui.logoutButton) {

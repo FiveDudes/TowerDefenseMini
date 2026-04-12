@@ -17,17 +17,6 @@
           <p>Choose your map and difficulty to begin.</p>
           <div class="title-columns">
             <div class="title-column">
-              <div class="column-label">Difficulty</div>
-              <div class="difficulty-buttons">
-                <button id="easy-btn" type="button" data-difficulty="easy">Easy</button>
-                <button id="medium-btn" type="button" data-difficulty="medium">Medium</button>
-                <button id="hard-btn" type="button" data-difficulty="hard">Hard</button>
-              </div>
-              <div class="difficulty-buttons">
-                <button id="tutorial-btn" type="button">Tutorial</button>
-              </div>
-            </div>
-            <div class="title-column">
               <div class="column-label">Map</div>
               <div class="map-picker">
                 <div class="map-grid">
@@ -55,7 +44,19 @@
               </div>
             </div>
             <div class="title-column">
+              <div class="column-label">Difficulty</div>
+              <div class="difficulty-buttons">
+                <button id="easy-btn" type="button" data-difficulty="easy">Easy</button>
+                <button id="medium-btn" type="button" data-difficulty="medium">Medium</button>
+                <button id="hard-btn" type="button" data-difficulty="hard">Hard</button>
+              </div>
+              <div class="difficulty-buttons">
+                <button id="tutorial-btn" type="button">Tutorial</button>
+              </div>
+            </div>
+            <div class="title-column">
               <div class="column-label">Login</div>
+              <button id="profile-button-title" class="btn-small hidden" type="button">Profile</button>
               <button id="login-button" class="game-menu-btn google-btn" type="button">
                 <img src="https://wikimedia.org" alt="Google Logo">
                 <span>Sign in with Google</span>
@@ -101,6 +102,7 @@
           </div>
         </div>
         <div class="topbar-secondary">
+          <button id="profile-button-top" class="btn-small hidden" type="button">Profile</button>
           <button id="game-login-button" class="google-btn google-btn-small" type="button">
             <img src="https://wikimedia.org" alt="Google Logo">
             <span>Sign in with Google</span>
