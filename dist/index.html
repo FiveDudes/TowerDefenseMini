@@ -93,6 +93,7 @@
           </div>
         </div>
         <div class="topbar-secondary">
+          <button id="profile-button" class="btn-small hidden" type="button">Profile</button>
           <button id="game-login-button" class="google-btn google-btn-small" type="button">
             <img src="https://wikimedia.org" alt="Google Logo">
             <span>Sign in with Google</span>
@@ -394,6 +395,40 @@
         <div class="encyclopedia-actions login-actions">
           <button id="submit-login" type="button">Sign in with Google</button>
           <button id="close-login" class="btn-secondary" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    <div id="profile-modal" class="encyclopedia-modal hidden" role="dialog" aria-modal="true">
+      <div class="encyclopedia-card profile-card">
+        <div class="encyclopedia-header">
+          <span class="encyclopedia-icon">P</span>
+          <span class="encyclopedia-title">COMMANDER PROFILE</span>
+        </div>
+        <div class="profile-layout">
+          <div class="profile-avatar-wrap">
+            <img id="profile-avatar-preview" class="profile-avatar" alt="Profile picture" />
+            <div class="profile-email" id="profile-email"></div>
+          </div>
+          <div class="profile-fields">
+            <label>
+              <span>Name</span>
+              <input id="profile-name-input" type="text" placeholder="Commander Name" />
+            </label>
+            <label>
+              <span>Profile Picture</span>
+              <input id="profile-avatar-input" type="file" accept="image/*" />
+            </label>
+            <div class="profile-stats">
+              <div><strong>Max Wave</strong><span id="profile-max-wave">0</span></div>
+              <div><strong>Max Damage</strong><span id="profile-max-damage">0</span></div>
+              <div><strong>Most Towers</strong><span id="profile-most-towers">0</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="encyclopedia-actions profile-actions">
+          <button id="save-profile" type="button">Save Profile</button>
+          <button id="profile-logout" class="btn-danger" type="button">Log Out</button>
+          <button id="close-profile" class="btn-secondary" type="button">Close</button>
         </div>
       </div>
     </div>

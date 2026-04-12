@@ -60,12 +60,25 @@ const APPWRITE_PROJECT_KEY = "tdm_appwrite_project";
 const APPWRITE_PROJECT_ID = "69db9f4c0018c3070ee8";
 const APPWRITE_ENDPOINT = "https://nyc.cloud.appwrite.io/v1";
 const APPWRITE_REDIRECT_URL = "https://towerdefensemini.appwrite.network/";
+const PROFILE_NAME_KEY = "tdm_profile_name";
+const PROFILE_AVATAR_KEY = "tdm_profile_avatar";
+const PROFILE_MAX_WAVE_KEY = "tdm_profile_max_wave";
+const PROFILE_MAX_DAMAGE_KEY = "tdm_profile_max_damage";
+const PROFILE_MOST_TOWERS_KEY = "tdm_profile_most_towers";
 const loginState = {
   email: "",
   loggedIn: false,
   loading: false,
   endpoint: localStorage.getItem(APPWRITE_ENDPOINT_KEY) || APPWRITE_ENDPOINT,
   project: APPWRITE_PROJECT_ID,
+};
+
+const profileState = {
+  name: localStorage.getItem(PROFILE_NAME_KEY) || "",
+  avatar: localStorage.getItem(PROFILE_AVATAR_KEY) || "",
+  maxWave: Number(localStorage.getItem(PROFILE_MAX_WAVE_KEY) || 0),
+  maxDamage: Number(localStorage.getItem(PROFILE_MAX_DAMAGE_KEY) || 0),
+  mostTowers: Number(localStorage.getItem(PROFILE_MOST_TOWERS_KEY) || 0),
 };
 
 const ui = {
@@ -96,8 +109,20 @@ const ui = {
   closeLogin: document.getElementById("close-login"),
   loginButton: document.getElementById("login-button"),
   gameLoginButton: document.getElementById("game-login-button"),
+  profileButton: document.getElementById("profile-button"),
   userWelcome: document.getElementById("user-welcome"),
   logoutButton: document.getElementById("logout-button"),
+  profileModal: document.getElementById("profile-modal"),
+  profileAvatarPreview: document.getElementById("profile-avatar-preview"),
+  profileEmail: document.getElementById("profile-email"),
+  profileNameInput: document.getElementById("profile-name-input"),
+  profileAvatarInput: document.getElementById("profile-avatar-input"),
+  profileMaxWave: document.getElementById("profile-max-wave"),
+  profileMaxDamage: document.getElementById("profile-max-damage"),
+  profileMostTowers: document.getElementById("profile-most-towers"),
+  saveProfile: document.getElementById("save-profile"),
+  profileLogout: document.getElementById("profile-logout"),
+  closeProfile: document.getElementById("close-profile"),
   tutorialModal: document.getElementById("tutorial-modal"),
   openTutorial: document.getElementById("tutorial-btn"),
   closeTutorial: document.getElementById("close-tutorial"),
@@ -709,6 +734,7 @@ function updateHud() {
   if (ui.buildSecret) {
     ui.buildSecret.classList.toggle("hidden", !state.secretTowerUnlocked);
   }
+  updateProfileProgress();
 }
 
 function getPlacedTowerCount() {
@@ -770,6 +796,131 @@ function setLoginStatus(message) {
   }
 }
 
+function getDefaultProfileName(account) {
+  const rawName = String(account?.name || "").trim();
+  if (rawName) return rawName;
+  const email = String(account?.email || "").trim();
+  if (!email) return "Commander";
+  const localPart = email.split("@")[0] || "";
+  const words = localPart
+    .replace(/[._-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+  return words.length > 0 ? words.join(" ") : "Commander";
+}
+
+function getProfileFallbackAvatar(name) {
+  const initials = String(name || "C")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "C";
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+      <defs>
+        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0b1b34"/>
+          <stop offset="100%" stop-color="#102f57"/>
+        </linearGradient>
+      </defs>
+      <rect width="256" height="256" rx="40" fill="url(#g)"/>
+      <circle cx="128" cy="106" r="54" fill="#dff2ff" fill-opacity="0.12"/>
+      <text x="128" y="144" text-anchor="middle" font-family="Orbitron, Arial, sans-serif" font-size="72" font-weight="700" fill="#dff2ff">${initials}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function persistProfileState() {
+  localStorage.setItem(PROFILE_NAME_KEY, profileState.name || "");
+  localStorage.setItem(PROFILE_AVATAR_KEY, profileState.avatar || "");
+  localStorage.setItem(PROFILE_MAX_WAVE_KEY, String(profileState.maxWave || 0));
+  localStorage.setItem(PROFILE_MAX_DAMAGE_KEY, String(profileState.maxDamage || 0));
+  localStorage.setItem(PROFILE_MOST_TOWERS_KEY, String(profileState.mostTowers || 0));
+}
+
+function syncProfileModal() {
+  const displayName = profileState.name || loginState.email || "Commander";
+  if (ui.profileEmail) {
+    ui.profileEmail.textContent = loginState.email ? `Signed in as ${loginState.email}` : "No active session";
+  }
+  if (ui.profileNameInput) {
+    ui.profileNameInput.value = displayName;
+  }
+  if (ui.profileAvatarPreview) {
+    ui.profileAvatarPreview.src = profileState.avatar || getProfileFallbackAvatar(displayName);
+  }
+  if (ui.profileMaxWave) ui.profileMaxWave.textContent = String(profileState.maxWave || 0);
+  if (ui.profileMaxDamage) ui.profileMaxDamage.textContent = String(Math.round(profileState.maxDamage || 0));
+  if (ui.profileMostTowers) ui.profileMostTowers.textContent = String(profileState.mostTowers || 0);
+}
+
+function updateProfileProgress() {
+  if (!loginState.loggedIn) return;
+  const currentWave = Math.max(0, Number(state.wave || 0));
+  const currentDamage = Math.max(0, Math.round(state.totalDamage || 0));
+  const currentTowers = getPlacedTowerCount();
+  let changed = false;
+  if (currentWave > profileState.maxWave) {
+    profileState.maxWave = currentWave;
+    changed = true;
+  }
+  if (currentDamage > profileState.maxDamage) {
+    profileState.maxDamage = currentDamage;
+    changed = true;
+  }
+  if (currentTowers > profileState.mostTowers) {
+    profileState.mostTowers = currentTowers;
+    changed = true;
+  }
+  if (changed) {
+    persistProfileState();
+  }
+  if (ui.profileMaxWave) ui.profileMaxWave.textContent = String(profileState.maxWave || 0);
+  if (ui.profileMaxDamage) ui.profileMaxDamage.textContent = String(Math.round(profileState.maxDamage || 0));
+  if (ui.profileMostTowers) ui.profileMostTowers.textContent = String(profileState.mostTowers || 0);
+}
+
+function openProfileModal() {
+  if (!loginState.loggedIn || !ui.profileModal) return;
+  syncProfileModal();
+  ui.profileModal.classList.remove("hidden");
+}
+
+function closeProfileModal() {
+  if (ui.profileModal) ui.profileModal.classList.add("hidden");
+}
+
+async function handleProfileAvatarUpload(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  if (!file.type || !file.type.startsWith("image/")) {
+    setLoginStatus("Choose an image file for the profile picture.");
+    return;
+  }
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Failed to read image"));
+    reader.readAsDataURL(file);
+  });
+  profileState.avatar = dataUrl;
+  persistProfileState();
+  syncProfileModal();
+}
+
+function saveProfile() {
+  const nextName = ui.profileNameInput ? ui.profileNameInput.value.trim() : "";
+  profileState.name = nextName || getDefaultProfileName({ name: loginState.email, email: loginState.email });
+  persistProfileState();
+  syncLoginButtons();
+  syncProfileModal();
+  setLoginStatus("Profile saved.");
+}
+
 function syncLoginButtons() {
   if (ui.loginButton) ui.loginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
   if (ui.gameLoginButton) ui.gameLoginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
@@ -778,11 +929,11 @@ function syncLoginButtons() {
   if (ui.loginButton) ui.loginButton.disabled = locked;
   if (ui.gameLoginButton) ui.gameLoginButton.disabled = locked;
   if (ui.logoutButton) ui.logoutButton.disabled = loginState.loading;
+  if (ui.profileButton) ui.profileButton.classList.toggle("hidden", !loginState.loggedIn);
   if (ui.userWelcome) {
     ui.userWelcome.classList.toggle("hidden", !loginState.loggedIn);
-    ui.userWelcome.textContent = loginState.loggedIn
-      ? `WELCOME, COMMANDER ${String(loginState.email || "Google user").toUpperCase()}`
-      : "";
+    const displayName = profileState.name || loginState.email || "Google user";
+    ui.userWelcome.textContent = loginState.loggedIn ? `WELCOME, COMMANDER ${String(displayName).toUpperCase()}` : "";
   }
   if (ui.logoutButton) {
     ui.logoutButton.classList.toggle("hidden", !loginState.loggedIn);
@@ -806,6 +957,7 @@ async function refreshLoginState() {
   if (!appwriteAccount || !configureAppwriteClient()) {
     loginState.loggedIn = false;
     loginState.email = "";
+    syncProfileModal();
     syncLoginButtons();
     return;
   }
@@ -813,10 +965,16 @@ async function refreshLoginState() {
     const account = await appwriteAccount.get();
     loginState.loggedIn = true;
     loginState.email = account?.email || account?.name || "Google user";
+    if (!profileState.name) {
+      profileState.name = getDefaultProfileName(account);
+    }
+    persistProfileState();
+    syncProfileModal();
     setLoginStatus(`Signed in as ${loginState.email}.`);
   } catch {
     loginState.loggedIn = false;
     loginState.email = "";
+    syncProfileModal();
   }
   syncLoginButtons();
 }
@@ -864,6 +1022,9 @@ async function submitLogin() {
 }
 
 function login() {
+  if (loginState.loggedIn || loginState.loading) {
+    return Promise.resolve();
+  }
   return appwriteAccount.createOAuth2Session("google", APPWRITE_REDIRECT_URL, APPWRITE_REDIRECT_URL);
 }
 
@@ -8130,6 +8291,10 @@ if (ui.gameLoginButton) {
   ui.gameLoginButton.addEventListener("click", login);
 }
 
+if (ui.profileButton) {
+  ui.profileButton.addEventListener("click", openProfileModal);
+}
+
 if (ui.logoutButton) {
   ui.logoutButton.addEventListener("click", logout);
 }
@@ -8146,6 +8311,32 @@ if (ui.loginModal) {
   ui.loginModal.addEventListener("click", (event) => {
     if (event.target === ui.loginModal) {
       closeLoginModal();
+    }
+  });
+}
+
+if (ui.saveProfile) {
+  ui.saveProfile.addEventListener("click", saveProfile);
+}
+
+if (ui.profileAvatarInput) {
+  ui.profileAvatarInput.addEventListener("change", (event) => {
+    void handleProfileAvatarUpload(event);
+  });
+}
+
+if (ui.profileLogout) {
+  ui.profileLogout.addEventListener("click", logout);
+}
+
+if (ui.closeProfile) {
+  ui.closeProfile.addEventListener("click", closeProfileModal);
+}
+
+if (ui.profileModal) {
+  ui.profileModal.addEventListener("click", (event) => {
+    if (event.target === ui.profileModal) {
+      closeProfileModal();
     }
   });
 }
