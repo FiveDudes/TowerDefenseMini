@@ -3916,11 +3916,6 @@ function updateTowerMovement(dt) {
   for (const tower of state.towers) {
     const data = towerTypes[tower.type];
     if (!data || !data.moveSpeed) continue;
-    if (tower.type === "drone" && !tower.isMini && (tower.upgradePath || 1) === 1) {
-      tower.x = tower.baseX;
-      tower.y = tower.baseY;
-      continue;
-    }
     const level = tower.level || 1;
     const speedMultiplier = 1 + (level - 1) * 0.12;
     if (state.controlledDrone === tower) {
@@ -5584,7 +5579,7 @@ function handleEnemyDeath(enemy) {
       immuneExplosion: false,
       explosionVulnerable: false,
     });
-  } else if (enemy.tier > 1 && !enemy.isBoss) {
+  } else if (enemy.type !== "swarmlet" && enemy.tier > 1 && !enemy.isBoss) {
     const nextTier = enemy.tier - 1;
     spawnSplitEnemy(enemy, nextTier);
     spawnSplitEnemy(enemy, nextTier);
