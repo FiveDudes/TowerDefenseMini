@@ -3070,7 +3070,9 @@ function fireProjectile(tower, enemy, stats) {
     const miniCount = stats.droneMiniCount || 0;
     const meleeRange = stats.droneMeleeRange || data.droneMeleeRange || 18;
     const targetPos = getEnemyPosition(enemy);
-    if (guns === 1 && miniCount === 0 && Math.hypot(targetPos.x - muzzle.x, targetPos.y - muzzle.y) <= meleeRange) {
+    const meleeOnly = (tower.upgradePath || 1) === 1 && guns === 1 && miniCount === 0 && !(stats.droneMissiles > 0);
+    const meleeDist = Math.hypot(targetPos.x - muzzle.x, targetPos.y - muzzle.y);
+    if (meleeOnly && meleeDist <= meleeRange) {
       applyDamage(enemy, damage);
       applySupportEffectsToEnemy(enemy, tower, { sourceType });
       playAttackImpactSound();
@@ -3081,6 +3083,9 @@ function fireProjectile(tower, enemy, stats) {
       if (enemy.hp <= 0) {
         handleEnemyDeath(enemy);
       }
+      return;
+    }
+    if (meleeOnly) {
       return;
     }
     const fireHoming = (x, y, dmg, speed) => {
@@ -3911,6 +3916,11 @@ function updateTowerMovement(dt) {
   for (const tower of state.towers) {
     const data = towerTypes[tower.type];
     if (!data || !data.moveSpeed) continue;
+    if (tower.type === "drone" && !tower.isMini && (tower.upgradePath || 1) === 1) {
+      tower.x = tower.baseX;
+      tower.y = tower.baseY;
+      continue;
+    }
     const level = tower.level || 1;
     const speedMultiplier = 1 + (level - 1) * 0.12;
     if (state.controlledDrone === tower) {
