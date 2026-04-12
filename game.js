@@ -1329,9 +1329,9 @@ function spawnEnemy() {
   const allowArmored = state.wave >= 5;
   const allowStealthRoll = state.wave >= 4;
   const allowDarkMatter = state.wave >= 17;
-  if (allowArmored && type !== "stealth" && Math.random() < 0.18) armored = true;
-  if (allowDarkMatter && Math.random() < 0.15) darkMatter = true;
   if (allowStealthRoll && Math.random() < 0.18) stealth = true;
+  if (allowArmored && !stealth && Math.random() < 0.18) armored = true;
+  if (allowDarkMatter && Math.random() < 0.15) darkMatter = true;
   if (type === "diamond" || type === "boss_diamond") {
     armored = true;
     darkMatter = false;
@@ -1379,7 +1379,7 @@ function spawnEnemy() {
 function registerEnemyInEncyclopedia(type, armored, darkMatter, stealth = false) {
   const entryKey = isBossType(type) ? "boss" : type;
   state.encyclopedia.add(entryKey);
-  if (armored && type !== "stealth" && !stealth) {
+  if (armored && !stealth) {
     state.encyclopedia.add("armored");
   }
   if (darkMatter) {
@@ -5494,6 +5494,9 @@ function spawnSplitEnemy(parent, tier, overrides = {}) {
     pathOffset: coalesce(overrides.pathOffset, parent.pathOffset),
     castleDamage: coalesce(overrides.castleDamage, parent.castleDamage),
   };
+  if (child.stealth) {
+    child.armored = false;
+  }
   if (child.armored) {
     child.armorHits = 0;
     child.armorBreakThreshold = 2 + Math.floor(Math.random() * 2);

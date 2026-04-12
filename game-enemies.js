@@ -86,7 +86,7 @@
       : null;
     const isStealth = coalesce(options.stealth, type === "stealth");
     const baseCastleDamage = type === "swarm" || type === "swarmlet" ? 8 : 5;
-    const armoredFlag = type !== "stealth" && (options.armored || isDiamond || isChimera || false);
+    const armoredFlag = !isStealth && (options.armored || isDiamond || isChimera || false);
     const darkMatterFlag = !armoredFlag && !isDiamond && (options.darkMatter || false);
     const enemy = {
       x: start.x + (pathOffset ? pathOffset.x : 0),
