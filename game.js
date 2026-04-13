@@ -120,10 +120,8 @@ window.APPWRITE_PROJECT_ID = APPWRITE_PROJECT_ID;
 window.APPWRITE_ENDPOINT = APPWRITE_ENDPOINT;
 window.APPWRITE_REDIRECT_URL = APPWRITE_REDIRECT_URL;
 window.APPWRITE_REALTIME_ENDPOINT = APPWRITE_REALTIME_ENDPOINT;
-window.ui = ui;
 window.loginState = loginState;
 window.profileState = profileState;
-window.leaderboardState = leaderboardState;
 window.titleCatalog = titleCatalog;
 
 const leaderboardState = {
@@ -284,6 +282,9 @@ const ui = {
   restartGame: document.getElementById("restart-game"),
   mainMenu: document.getElementById("main-menu"),
 };
+
+window.ui = ui;
+window.leaderboardState = leaderboardState;
 
 document.title = "Tower Defense Mini V2.14";
 for (const heading of document.querySelectorAll(".title-card h1, .topbar h1")) {
