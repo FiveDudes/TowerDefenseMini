@@ -34,14 +34,14 @@
     const rawName = String(account?.name || "").trim();
     if (rawName) return rawName;
     const email = String(account?.email || "").trim();
-    if (!email) return "Commander";
+    if (!email) return "Player";
     const localPart = email.split("@")[0] || "";
     const words = localPart
       .replace(/[._-]+/g, " ")
       .split(/\s+/)
       .filter(Boolean)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
-    return words.length > 0 ? words.join(" ") : "Commander";
+    return words.length > 0 ? words.join(" ") : "Player";
   }
 
   function getAccountAvatarUrl(account) {
@@ -372,7 +372,7 @@
     const ui = getUi();
     const profileState = getProfileState();
     const loginState = getLoginState();
-    const displayName = profileState.name || loginState.email || "Commander";
+    const displayName = profileState.name || loginState.email || "Player";
     const unlockedTitles = getUnlockedTitleOptions();
     if (ui.profileEmail) {
       ui.profileEmail.textContent = loginState.email ? `Signed in as ${loginState.email}` : "No active session";
@@ -519,7 +519,7 @@
       const displayName = profileState.name || loginState.email || "Google user";
       const titlePrefix = getActiveTitleName();
       const prefixText = titlePrefix ? `${titlePrefix.toUpperCase()} ` : "";
-      ui.userWelcome.textContent = loginState.loggedIn ? `WELCOME, ${prefixText}COMMANDER ${String(displayName).toUpperCase()}` : "";
+      ui.userWelcome.textContent = loginState.loggedIn ? `WELCOME, ${prefixText}${String(displayName).toUpperCase()}` : "";
     }
     if (ui.logoutButton) {
       ui.logoutButton.classList.toggle("hidden", !loginState.loggedIn);

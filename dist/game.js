@@ -2445,7 +2445,7 @@ function getTowerDescription(type) {
     case "freeze":
       return "Gas clouds that spread out and slow enemies.";
     case "drone":
-      return "Mobile tower that chases targets. Upgrade into Missile Drone or Drone Commander.";
+      return "Mobile tower that chases targets. Upgrade into Missile Drone or Drone Leader.";
     case "bomb":
       return "Explosive shots with splash damage.";
     case "laser":
