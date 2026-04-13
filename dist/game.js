@@ -389,6 +389,7 @@ const state = {
   mapEndCell: null,
   mapEndPoint: null,
   mapBurnDamageMult: 1,
+  mapEffects: [],
   mapPalette: {
     top: "#200b3b",
     mid: "#130820",
@@ -420,6 +421,9 @@ const state = {
   sixSevenTimer: null,
   halfCash: false,
   radioactiveFactoryBonus: 0,
+  waveKillsThisWave: 0,
+  waveLeaksThisWave: 0,
+  waveSpawnedThisWave: 0,
 };
 
 window.state = state;
@@ -592,6 +596,7 @@ function setActiveMap(mapId) {
   state.mapEndPoint = snapToGrid(endPoint.x, endPoint.y);
   state.mapEndCell = worldToCell(state.mapEndPoint.x, state.mapEndPoint.y);
   state.mapBurnDamageMult = map.burnDamageMult || 1;
+  state.mapEffects = Array.isArray(map.effects) ? map.effects : [];
   state.mapPalette = map.palette || state.mapPalette;
   state.pathPoints = [];
   state.preferredPathCells = buildPreferredPathCells(state.mapPaths);
@@ -621,6 +626,52 @@ function isPointNearAnyPath(paths, x, y, buffer) {
     if (isPointNearPath(points, x, y, buffer)) return true;
   }
   return false;
+}
+
+function isPointInMapEffect(effect, x, y) {
+  if (!effect) return false;
+  if (effect.shape === "rect") {
+    return x >= effect.x && x <= effect.x + effect.width && y >= effect.y && y <= effect.y + effect.height;
+  }
+  const radius = Number.isFinite(effect.radius) ? effect.radius : 0;
+  return Math.hypot(x - effect.x, y - effect.y) <= radius;
+}
+
+function applyMapEffectsToEnemy(enemy, dt) {
+  const effects = Array.isArray(state.mapEffects) ? state.mapEffects : [];
+  if (effects.length === 0 || !enemy || enemy.hp <= 0 || enemy.escaped) return;
+  for (const effect of effects) {
+    if (!isPointInMapEffect(effect, enemy.x, enemy.y)) continue;
+    if (effect.type === "slow" && Number.isFinite(effect.slowFactor) && effect.slowFactor > 0) {
+      enemy.slowTimer = Math.max(enemy.slowTimer || 0, dt + 0.05);
+      enemy.slowFactor = Math.max(enemy.slowFactor || 0, effect.slowFactor);
+    } else if (effect.type === "damage" && Number.isFinite(effect.damagePerSecond) && effect.damagePerSecond > 0) {
+      applyDamage(enemy, effect.damagePerSecond * dt);
+    }
+  }
+}
+
+function drawMapEffects() {
+  const effects = Array.isArray(state.mapEffects) ? state.mapEffects : [];
+  if (effects.length === 0) return;
+  ctx.save();
+  for (const effect of effects) {
+    const fill = effect.color || (effect.type === "slow" ? "rgba(56, 189, 248, 0.12)" : "rgba(248, 113, 113, 0.12)");
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = effect.type === "slow" ? "rgba(125, 211, 252, 0.35)" : "rgba(248, 113, 113, 0.3)";
+    ctx.lineWidth = 1.5;
+    if (effect.shape === "rect") {
+      ctx.fillRect(effect.x, effect.y, effect.width, effect.height);
+      ctx.strokeRect(effect.x, effect.y, effect.width, effect.height);
+    } else {
+      const radius = Number.isFinite(effect.radius) ? effect.radius : 0;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 function buildPreferredPathCells(paths) {
@@ -1388,6 +1439,9 @@ function startWave() {
   state.wave += 1;
   state.waveInProgress = true;
   state.waveHasSpawnedNonSpeedy = false;
+  state.waveKillsThisWave = 0;
+  state.waveLeaksThisWave = 0;
+  state.waveSpawnedThisWave = 0;
   if (state.wave % 10 === 0) {
     state.enemiesToSpawn = 1;
   } else {
@@ -1527,6 +1581,7 @@ function spawnEnemy() {
   if (type !== "speedy") {
     state.waveHasSpawnedNonSpeedy = true;
   }
+  state.waveSpawnedThisWave = (state.waveSpawnedThisWave || 0) + 1;
   registerEnemyInEncyclopedia(type, armored, darkMatter, stealth);
   const enemy = createEnemy(type, { armored, darkMatter, stealth, pathGroup, packId });
   state.enemies.push(enemy);
@@ -5236,6 +5291,7 @@ function updateEnemies(dt) {
         }
       }
     }
+    applyMapEffectsToEnemy(enemy, dt);
     if (enemy.stunTimer > 0) {
       enemy.stunTimer -= dt;
       if (enemy.stunTimer > 0) {
@@ -5277,6 +5333,7 @@ function updateEnemies(dt) {
         const hit = enemy.castleDamage || 1;
         state.lives = Math.max(0, state.lives - hit);
         state.enemyDamageByType[enemy.type] = (state.enemyDamageByType[enemy.type] || 0) + hit;
+        state.waveLeaksThisWave = (state.waveLeaksThisWave || 0) + hit;
         if (enemy.type === "saboteur") {
           disableFactories();
         }
@@ -5626,10 +5683,14 @@ function handleEnemyDeath(enemy) {
   enemy.deadProcessed = true;
   if (enemy.escaped) return;
   playSound("death");
+  state.waveKillsThisWave = (state.waveKillsThisWave || 0) + 1;
   const bonusGold = state.factoryKillGoldBonus || 0;
   const bonusLives = state.factoryKillLifeBonus || 0;
   const dropLives = enemy.dropLives || 0;
   const dropGoldMult = enemy.dropGoldMult || 0;
+  const pathLength = Array.isArray(enemy.path) ? Math.max(1, enemy.path.length - 1) : 1;
+  const progress = Math.min(1, Math.max(0, (enemy.pathIndex || 0) / pathLength));
+  const efficiencyBonus = progress <= 0.3 ? 2 : progress <= 0.55 ? 1 : 0;
   const handled = invokeEnemyHook(enemy, "onDeath", {
     spawnSplitEnemy,
     getEnemyRadius,
@@ -5691,6 +5752,9 @@ function handleEnemyDeath(enemy) {
   const baseGold = 8 + bonusGold;
   const goldMult = dropGoldMult && dropGoldMult > 1 ? dropGoldMult : 1;
   awardGold(baseGold * goldMult);
+  if (efficiencyBonus > 0) {
+    awardGold(efficiencyBonus);
+  }
   if (bonusLives > 0) {
     state.lives = Math.min(state.maxLives, state.lives + bonusLives);
   }
@@ -5923,6 +5987,10 @@ function updateSpawner(dt) {
     }
   }
   if (state.enemiesToSpawn === 0 && state.enemies.length === 0) {
+    if ((state.waveLeaksThisWave || 0) === 0) {
+      const cleanWaveBonus = Math.max(2, Math.round((state.waveSpawnedThisWave || 0) / 8));
+      awardGold(cleanWaveBonus);
+    }
     state.waveInProgress = false;
     if (state.radioactiveWave === state.wave) {
       state.radioactiveWave = null;
@@ -7371,6 +7439,7 @@ function drawBackground() {
     ctx.fill();
   }
   drawGrid();
+  drawMapEffects();
   drawPortal();
   drawCastle();
   drawPath();
@@ -8486,6 +8555,10 @@ function resetGame() {
   state.auraSnapshot = null;
   state.waveSpeed = 1;
   state.towerLevelCap = 5;
+  state.mapEffects = [];
+  state.waveKillsThisWave = 0;
+  state.waveLeaksThisWave = 0;
+  state.waveSpawnedThisWave = 0;
   state.infiniteGold = false;
   state.halfCash = false;
   state.keyBuffer = "";
