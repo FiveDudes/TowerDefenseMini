@@ -9,6 +9,7 @@ const filesToCopy = [
   "index.js",
   "styles.css",
   "game.js",
+  "game-profile.js",
   "game-enemies.js",
   "game-effects.js",
   "game-audio.js",
