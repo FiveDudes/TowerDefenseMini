@@ -391,7 +391,6 @@ const state = {
   mapEndCell: null,
   mapEndPoint: null,
   mapBurnDamageMult: 1,
-  mapEffects: [],
   mapPalette: {
     top: "#200b3b",
     mid: "#130820",
@@ -599,7 +598,6 @@ function setActiveMap(mapId) {
   state.mapEndPoint = snapToGrid(endPoint.x, endPoint.y);
   state.mapEndCell = worldToCell(state.mapEndPoint.x, state.mapEndPoint.y);
   state.mapBurnDamageMult = map.burnDamageMult || 1;
-  state.mapEffects = Array.isArray(map.effects) ? map.effects : [];
   state.mapPalette = map.palette || state.mapPalette;
   state.pathPoints = [];
   state.preferredPathCells = buildPreferredPathCells(state.mapPaths);
@@ -629,52 +627,6 @@ function isPointNearAnyPath(paths, x, y, buffer) {
     if (isPointNearPath(points, x, y, buffer)) return true;
   }
   return false;
-}
-
-function isPointInMapEffect(effect, x, y) {
-  if (!effect) return false;
-  if (effect.shape === "rect") {
-    return x >= effect.x && x <= effect.x + effect.width && y >= effect.y && y <= effect.y + effect.height;
-  }
-  const radius = Number.isFinite(effect.radius) ? effect.radius : 0;
-  return Math.hypot(x - effect.x, y - effect.y) <= radius;
-}
-
-function applyMapEffectsToEnemy(enemy, dt) {
-  const effects = Array.isArray(state.mapEffects) ? state.mapEffects : [];
-  if (effects.length === 0 || !enemy || enemy.hp <= 0 || enemy.escaped) return;
-  for (const effect of effects) {
-    if (!isPointInMapEffect(effect, enemy.x, enemy.y)) continue;
-    if (effect.type === "slow" && Number.isFinite(effect.slowFactor) && effect.slowFactor > 0) {
-      enemy.slowTimer = Math.max(enemy.slowTimer || 0, dt + 0.05);
-      enemy.slowFactor = Math.max(enemy.slowFactor || 0, effect.slowFactor);
-    } else if (effect.type === "damage" && Number.isFinite(effect.damagePerSecond) && effect.damagePerSecond > 0) {
-      applyDamage(enemy, effect.damagePerSecond * dt);
-    }
-  }
-}
-
-function drawMapEffects() {
-  const effects = Array.isArray(state.mapEffects) ? state.mapEffects : [];
-  if (effects.length === 0) return;
-  ctx.save();
-  for (const effect of effects) {
-    const fill = effect.color || (effect.type === "slow" ? "rgba(56, 189, 248, 0.12)" : "rgba(248, 113, 113, 0.12)");
-    ctx.fillStyle = fill;
-    ctx.strokeStyle = effect.type === "slow" ? "rgba(125, 211, 252, 0.35)" : "rgba(248, 113, 113, 0.3)";
-    ctx.lineWidth = 1.5;
-    if (effect.shape === "rect") {
-      ctx.fillRect(effect.x, effect.y, effect.width, effect.height);
-      ctx.strokeRect(effect.x, effect.y, effect.width, effect.height);
-    } else {
-      const radius = Number.isFinite(effect.radius) ? effect.radius : 0;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
 }
 
 function buildPreferredPathCells(paths) {
@@ -5295,7 +5247,6 @@ function updateEnemies(dt) {
         }
       }
     }
-    applyMapEffectsToEnemy(enemy, dt);
     if (enemy.stunTimer > 0) {
       enemy.stunTimer -= dt;
       if (enemy.stunTimer > 0) {
@@ -7444,7 +7395,6 @@ function drawBackground() {
     ctx.fill();
   }
   drawGrid();
-  drawMapEffects();
   drawPortal();
   drawCastle();
   drawPath();
@@ -8568,7 +8518,6 @@ function resetGame() {
   state.auraSnapshot = null;
   state.waveSpeed = 1;
   state.towerLevelCap = 5;
-  state.mapEffects = [];
   state.waveKillsThisWave = 0;
   state.waveLeaksThisWave = 0;
   state.waveSpawnedThisWave = 0;
