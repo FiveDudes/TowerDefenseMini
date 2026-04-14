@@ -193,6 +193,29 @@
     return String(entry?.name || entry?.playerName || entry?.username || entry?.email || "Unknown");
   }
 
+  function getLeaderboardEmail(entry) {
+    return String(entry?.email || entry?.playerEmail || entry?.userEmail || "").trim().toLowerCase();
+  }
+
+  function dedupeLeaderboardRows(rows, metric = getLeaderboardState().metric) {
+    const bestByEmail = new Map();
+    const anonymousRows = [];
+    for (const row of rows || []) {
+      if (!row) continue;
+      const email = getLeaderboardEmail(row);
+      if (!email) {
+        anonymousRows.push(row);
+        continue;
+      }
+      const value = getLeaderboardMetricValue(row, metric);
+      const current = bestByEmail.get(email);
+      if (!current || value > getLeaderboardMetricValue(current, metric)) {
+        bestByEmail.set(email, row);
+      }
+    }
+    return [...bestByEmail.values(), ...anonymousRows];
+  }
+
   function getLeaderboardMetricValue(entry, metric = getLeaderboardState().metric) {
     if (metric === "towers") {
       return Number(entry?.towersPlaced ?? entry?.towerCount ?? entry?.towers ?? entry?.score ?? 0);
@@ -271,7 +294,8 @@
     }
     if (!ui.leaderboardList) return;
     ui.leaderboardList.innerHTML = "";
-    const sorted = [...rows].sort((a, b) => getLeaderboardMetricValue(b) - getLeaderboardMetricValue(a)).slice(0, 100);
+    const deduped = dedupeLeaderboardRows(rows, leaderboardState.metric);
+    const sorted = [...deduped].sort((a, b) => getLeaderboardMetricValue(b) - getLeaderboardMetricValue(a)).slice(0, 100);
     if (sorted.length === 0) {
       const item = globalScope.document.createElement("li");
       item.textContent = "No leaderboard entries yet.";
@@ -302,7 +326,7 @@
     } else {
       leaderboardState.rows.unshift(nextRow);
     }
-    leaderboardState.rows = leaderboardState.rows
+    leaderboardState.rows = dedupeLeaderboardRows(leaderboardState.rows, leaderboardState.metric)
       .filter(Boolean)
       .sort((a, b) => getLeaderboardMetricValue(b) - getLeaderboardMetricValue(a))
       .slice(0, 200);
@@ -376,6 +400,7 @@
     const profileState = getProfileState();
     const loginState = getLoginState();
     const name = profileState.name || loginState.email || "Player";
+    const email = String(loginState.email || "").trim();
     const towersPlaced = Math.max(0, Number(state.totalTowersPlaced || state.towers?.length || 0));
     const enemiesKilled = Math.max(0, Number(state.totalEnemiesKilled || state.waveKillsThisWave || 0));
     const wavesCompleted = Math.max(0, Number(state.wave || 0));
@@ -384,6 +409,9 @@
       name,
       playerName: name,
       username: name,
+      email,
+      playerEmail: email,
+      userEmail: email,
       wavesCompleted,
       enemiesKilled,
       towersPlaced,
@@ -405,7 +433,7 @@
     localEntries.unshift(entry);
     persistSavedScoreboardEntries(localEntries);
     if (!globalScope.appwriteClient || !globalScope.appwriteApi?.Databases || !dbId || !collectionId) {
-      leaderboardState.rows = [entry, ...leaderboardState.rows].slice(0, 200);
+      leaderboardState.rows = dedupeLeaderboardRows([entry, ...leaderboardState.rows], leaderboardState.metric).slice(0, 200);
       renderLeaderboard();
       return entry;
     }
@@ -422,7 +450,7 @@
       if (getUi().leaderboardStatus) {
         getUi().leaderboardStatus.textContent = `Score saved locally: ${error?.message || error}`;
       }
-      leaderboardState.rows = [entry, ...leaderboardState.rows].slice(0, 200);
+      leaderboardState.rows = dedupeLeaderboardRows([entry, ...leaderboardState.rows], leaderboardState.metric).slice(0, 200);
       renderLeaderboard();
       return entry;
     }
