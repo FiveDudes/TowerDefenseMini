@@ -169,6 +169,7 @@ const ui = {
   leaderboardList: document.getElementById("leaderboard-list"),
   leaderboardModal: document.getElementById("leaderboard-modal"),
   leaderboardType: document.getElementById("leaderboard-type"),
+  clearLeaderboard: document.getElementById("clear-leaderboard"),
   closeLeaderboard: document.getElementById("close-leaderboard"),
   profileModal: document.getElementById("profile-modal"),
   profileAvatarPreview: document.getElementById("profile-avatar-preview"),
@@ -521,6 +522,12 @@ const grid = {
 
 const gridCols = Math.floor(canvas.width / grid.size);
 const gridRows = Math.floor(canvas.height / grid.size);
+const firstPersonView = {
+  horizonRatio: 0.22,
+  depthExponent: 1.65,
+  lateralExponent: 1.3,
+  swayAmplitude: 0.004,
+};
 
 function cellKey(cx, cy) {
   return `${cx},${cy}`;
@@ -537,6 +544,25 @@ function worldToCell(x, y) {
   const cx = Math.max(0, Math.min(gridCols - 1, Math.floor(x / grid.size)));
   const cy = Math.max(0, Math.min(gridRows - 1, Math.floor(y / grid.size)));
   return { cx, cy };
+}
+
+function getFirstPersonProjection(x, y, lift = 0) {
+  const horizonY = canvas.height * firstPersonView.horizonRatio;
+  const groundHeight = canvas.height - horizonY;
+  const depth = Math.max(0, Math.min(1, y / canvas.height));
+  const easedDepth = depth * depth * (3 - 2 * depth);
+  const lateral = 0.12 + Math.pow(easedDepth, firstPersonView.lateralExponent) * 0.88;
+  const sway = Math.sin(performance.now() * 0.00035) * canvas.width * firstPersonView.swayAmplitude;
+  return {
+    x: canvas.width / 2 + (x - canvas.width / 2) * lateral + sway * (1 - easedDepth),
+    y: horizonY + groundHeight * Math.pow(depth, firstPersonView.depthExponent) - lift * (0.25 + easedDepth * 0.75),
+    scale: 0.5 + easedDepth * 0.95,
+    depth: easedDepth,
+  };
+}
+
+function projectPoint(x, y, lift = 0) {
+  return getFirstPersonProjection(x, y, lift);
 }
 
 function isWallAdjacentToPath(x, y) {
@@ -5969,104 +5995,63 @@ function drawPath() {
   const outerColor = lerpColor([8, 16, 32], [40, 8, 56], lossRatio);
   const midColor = lerpColor([9, 20, 36], [54, 9, 80], lossRatio);
   const innerColor = lerpColor([24, 74, 110], [120, 40, 150], lossRatio);
-  const junctions = new Map();
-  const junctionDirs = new Map();
-  const addDir = (point, dir) => {
-    const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
-    if (!junctionDirs.has(key)) {
-      junctionDirs.set(key, { x: point.x, y: point.y, dirs: new Set() });
-    }
-    junctionDirs.get(key).dirs.add(dir);
-  };
-  for (const points of paths) {
-    if (!points || points.length === 0) continue;
-    for (const point of points) {
-      const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
-      const entry = junctions.get(key) || { x: point.x, y: point.y, count: 0 };
-      entry.count += 1;
-      junctions.set(key, entry);
-    }
-  }
-  for (const points of paths) {
-    if (!points || points.length < 2) continue;
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const a = points[i];
-      const b = points[i + 1];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const dir = Math.abs(dx) >= Math.abs(dy)
-        ? (dx > 0 ? "E" : "W")
-        : (dy > 0 ? "S" : "N");
-      const opposite = dir === "E" ? "W" : dir === "W" ? "E" : dir === "S" ? "N" : "S";
-      addDir(a, dir);
-      addDir(b, opposite);
-    }
-  }
+  const time = performance.now();
   for (const points of paths) {
     if (!points || points.length < 2) continue;
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-
-    ctx.strokeStyle = outerColor;
-    ctx.lineWidth = 40;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y);
+    const layers = [
+      { color: outerColor, width: 18, dash: [2, 26], speed: 0.025, alpha: 0.18 },
+      { color: midColor, width: 10, dash: [2, 18], speed: 0.04, alpha: 0.34 },
+      { color: innerColor, width: 4.5, dash: [1, 14], speed: 0.06, alpha: 0.9 },
+    ];
+    for (const layer of layers) {
+      ctx.strokeStyle = layer.color;
+      ctx.lineWidth = layer.width;
+      ctx.globalAlpha = layer.alpha;
+      ctx.setLineDash(layer.dash);
+      ctx.lineDashOffset = -(time * layer.speed);
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const a = projectPoint(points[i].x, points[i].y);
+        const b = projectPoint(points[i + 1].x, points[i + 1].y);
+        if (!started) {
+          ctx.moveTo(a.x, a.y);
+          started = true;
+        }
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
-
-    ctx.strokeStyle = midColor;
-    ctx.lineWidth = 24;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y);
-    }
-    ctx.stroke();
-
-    ctx.strokeStyle = innerColor;
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y);
-    }
-    ctx.stroke();
 
     ctx.restore();
   }
-  for (const entry of junctions.values()) {
-    if (entry.count < 2) continue;
-    const dirEntry = junctionDirs.get(`${Math.round(entry.x)}:${Math.round(entry.y)}`);
-    if (!dirEntry || dirEntry.dirs.size < 2) continue;
-    const connector = 12;
-    const drawConnector = (width, color) => {
+  for (const points of paths) {
+    if (!points || points.length === 0) continue;
+    for (const point of points) {
+      const view = projectPoint(point.x, point.y);
+      const dotSize = 1.4 + view.depth * 1.8;
       ctx.save();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = "butt";
-      for (const dir of dirEntry.dirs) {
-        const dx = dir === "E" ? 1 : dir === "W" ? -1 : 0;
-        const dy = dir === "S" ? 1 : dir === "N" ? -1 : 0;
-        ctx.beginPath();
-        ctx.moveTo(entry.x, entry.y);
-        ctx.lineTo(entry.x + dx * connector, entry.y + dy * connector);
-        ctx.stroke();
-      }
+      ctx.globalAlpha = 0.16 + view.depth * 0.24;
+      ctx.fillStyle = "rgba(186, 230, 253, 0.9)";
+      ctx.beginPath();
+      ctx.arc(view.x, view.y, dotSize, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
-    };
-    drawConnector(40, outerColor);
-    drawConnector(24, midColor);
-    drawConnector(8, innerColor);
+    }
   }
 }
 
 function drawPortalAt(origin, t) {
+  const view = projectPoint(origin.x, origin.y);
   const pulse = 0.5 + Math.sin(t * 0.004) * 0.5;
   const outer = 26 + pulse * 6;
   ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.scale(view.scale, view.scale);
+  ctx.translate(-origin.x, -origin.y);
   const glow = ctx.createRadialGradient(origin.x, origin.y, 4, origin.x, origin.y, outer + 16);
   glow.addColorStop(0, "rgba(217, 70, 239, 0.95)");
   glow.addColorStop(0.5, "rgba(147, 51, 234, 0.6)");
@@ -6135,7 +6120,11 @@ function getCastlePoint() {
 
 function drawCastle() {
   const target = getCastlePoint();
+  const view = projectPoint(target.x, target.y);
   ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.scale(view.scale, view.scale);
+  ctx.translate(-target.x, -target.y);
   ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
   ctx.fillRect(target.x - 30, target.y - 22, 60, 40);
   ctx.strokeStyle = "rgba(226, 232, 240, 0.6)";
@@ -6167,20 +6156,87 @@ function drawCastle() {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.1)";
-  ctx.lineWidth = 1;
+  const horizonY = canvas.height * firstPersonView.horizonRatio;
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "rgba(4, 6, 18, 0.9)");
+  gradient.addColorStop(Math.max(0.02, horizonY / canvas.height), "rgba(13, 18, 40, 0.92)");
+  gradient.addColorStop(1, "rgba(2, 6, 18, 1)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const glow = ctx.createRadialGradient(canvas.width / 2, horizonY, 24, canvas.width / 2, horizonY, canvas.width * 0.85);
+  glow.addColorStop(0, "rgba(56, 189, 248, 0.18)");
+  glow.addColorStop(0.35, "rgba(99, 102, 241, 0.1)");
+  glow.addColorStop(1, "rgba(2, 6, 18, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const rows = Math.max(10, gridRows + 2);
+  for (let row = rows; row >= 1; row -= 1) {
+    const y1 = canvas.height - ((row - 1) / rows) * canvas.height;
+    const y2 = canvas.height - (row / rows) * canvas.height;
+    const topLeft = projectPoint(0, y2);
+    const topRight = projectPoint(canvas.width, y2);
+    const bottomRight = projectPoint(canvas.width, y1);
+    const bottomLeft = projectPoint(0, y1);
+    const alpha = 0.035 + (1 - row / rows) * 0.07;
+    ctx.fillStyle = row % 2 === 0 ? `rgba(15, 23, 42, ${alpha})` : `rgba(30, 41, 59, ${alpha * 0.9})`;
+    ctx.beginPath();
+    ctx.moveTo(topLeft.x, topLeft.y);
+    ctx.lineTo(topRight.x, topRight.y);
+    ctx.lineTo(bottomRight.x, bottomRight.y);
+    ctx.lineTo(bottomLeft.x, bottomLeft.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.12)";
+  ctx.lineWidth = 1.25;
   for (let x = 0; x <= canvas.width; x += grid.size) {
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
+    let first = true;
+    for (let y = canvas.height; y >= 0; y -= 12) {
+      const point = projectPoint(x, y);
+      if (first) {
+        ctx.moveTo(point.x, point.y);
+        first = false;
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    }
     ctx.stroke();
   }
-  for (let y = 0; y <= canvas.height; y += grid.size) {
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+  ctx.lineWidth = 1;
+  for (let y = canvas.height; y >= 0; y -= grid.size) {
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
+    let first = true;
+    for (let x = 0; x <= canvas.width; x += 12) {
+      const point = projectPoint(x, y);
+      if (first) {
+        ctx.moveTo(point.x, point.y);
+        first = false;
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    }
     ctx.stroke();
   }
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
+  ctx.beginPath();
+  ctx.ellipse(canvas.width / 2, horizonY, canvas.width * 0.18, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(96, 165, 250, 0.16)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2, horizonY - 8);
+  ctx.lineTo(canvas.width / 2, canvas.height);
+  ctx.stroke();
 }
 
 function shadeColor(hex, factor) {
@@ -6334,9 +6390,10 @@ function drawMines() {
     const supportEffects = tower.type === "floorSpike" ? getSupportEffectsForSource(tower, { sourceType: "floorSpike" }) : null;
     const spawnAlpha = tower.spawnInTimer > 0 ? 1 - tower.spawnInTimer / 0.18 : 1;
     const spawnScale = tower.spawnInTimer > 0 ? 0.82 + spawnAlpha * 0.18 : 1;
+    const view = projectPoint(tower.x, tower.y);
     ctx.save();
-    ctx.translate(tower.x, tower.y);
-    ctx.scale(spawnScale, spawnScale);
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale * spawnScale, view.scale * spawnScale);
     ctx.translate(-tower.x, -tower.y);
     ctx.globalAlpha = Math.max(0.35, spawnAlpha);
     if (data.isMine) {
@@ -6445,9 +6502,10 @@ function drawTowers() {
     const supportEffects = getSupportEffectsForSource(tower, { sourceType: tower.type });
     const spawnAlpha = tower.spawnInTimer > 0 ? 1 - tower.spawnInTimer / 0.18 : 1;
     const spawnScale = tower.spawnInTimer > 0 ? 0.82 + spawnAlpha * 0.18 : 1;
+    const view = projectPoint(tower.x, tower.y);
     ctx.save();
-    ctx.translate(tower.x, tower.y);
-    ctx.scale(spawnScale, spawnScale);
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale * spawnScale, view.scale * spawnScale);
     ctx.translate(-tower.x, -tower.y);
     ctx.globalAlpha = Math.max(0.35, spawnAlpha);
     if (tower.type === "wall") {
@@ -6678,6 +6736,11 @@ function drawTowers() {
 
 function drawTraps() {
   for (const trap of state.traps) {
+    const view = projectPoint(trap.x, trap.y);
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-trap.x, -trap.y);
     if (trap.turret) {
       ctx.fillStyle = "rgba(12, 18, 35, 0.95)";
       ctx.beginPath();
@@ -6686,6 +6749,7 @@ function drawTraps() {
       ctx.strokeStyle = "rgba(250, 204, 21, 0.8)";
       ctx.lineWidth = 2;
       ctx.stroke();
+      ctx.restore();
       continue;
     }
     if (trap.explode) {
@@ -6693,6 +6757,7 @@ function drawTraps() {
       ctx.beginPath();
       ctx.arc(trap.x, trap.y, 7, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
       continue;
     }
     ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
@@ -6702,6 +6767,7 @@ function drawTraps() {
     ctx.lineTo(trap.x, trap.y - 8);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -6718,7 +6784,6 @@ function drawEnemies() {
 
   function drawTriangle(x, y, size, angle, color) {
     ctx.save();
-    ctx.translate(x, y);
     ctx.rotate(angle);
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -6814,8 +6879,12 @@ function drawEnemies() {
 
   for (const enemy of state.enemies) {
     const pos = getEnemyPosition(enemy);
+    const view = projectPoint(pos.x, pos.y, enemy.flyHeight || 0);
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-pos.x, -pos.y);
     if (enemy.stealth && !enemy.revealed) {
-      ctx.save();
       ctx.globalAlpha = 0.35;
     }
     const tierScale = 1 + (enemy.tier - 1) * 0.18;
@@ -7042,9 +7111,7 @@ function drawEnemies() {
     ctx.fillRect(pos.x - 16, pos.y - 22, 32, 6);
     ctx.fillStyle = "#22c55e";
     ctx.fillRect(pos.x - 16, pos.y - 22, 32 * hpRatio, 6);
-    if (enemy.stealth && !enemy.revealed) {
-      ctx.restore();
-    }
+    ctx.restore();
   }
 }
 
@@ -7347,7 +7414,6 @@ function drawBeams() {
 
 function drawPlacementPreview() {
   if (!state.placing) return;
-  const rect = canvas.getBoundingClientRect();
   const x = state.mouse.x;
   const y = state.mouse.y;
   const snapped = snapToGrid(x, y);
@@ -7358,6 +7424,11 @@ function drawPlacementPreview() {
   const invalidWave = Boolean(data.blocksPath && state.waveInProgress && isOnPath(snapped.x, snapped.y));
   const invalidMine = (state.placing === "mine" || state.placing === "floorSpike") && !isOnPath(snapped.x, snapped.y);
   const invalid = invalidPath || invalidMine || invalidWave || invalidSpike;
+  const view = projectPoint(snapped.x, snapped.y);
+  ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.scale(view.scale, view.scale);
+  ctx.translate(-snapped.x, -snapped.y);
   ctx.strokeStyle = invalid ? "rgba(239, 68, 68, 0.8)" : "rgba(34, 197, 94, 0.8)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -7370,6 +7441,7 @@ function drawPlacementPreview() {
   ctx.arc(snapped.x, snapped.y, 16, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawBackground() {
@@ -7379,13 +7451,7 @@ function drawBackground() {
     bottom: "#0c0516",
     shadow: "rgba(0, 0, 0, 0.3)",
   };
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, palette.top);
-  gradient.addColorStop(0.5, palette.mid);
-  gradient.addColorStop(1, palette.bottom);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+  drawGrid();
   for (const shadow of state.shadowSeeds) {
     const x = (shadow.x + performance.now() * 0.02 * shadow.speed) % (canvas.width + 120) - 60;
     const y = (shadow.y + performance.now() * 0.015 * shadow.speed) % (canvas.height + 120) - 60;
@@ -7394,7 +7460,6 @@ function drawBackground() {
     ctx.arc(x, y, shadow.size, 0, Math.PI * 2);
     ctx.fill();
   }
-  drawGrid();
   drawPortal();
   drawCastle();
   drawPath();
@@ -8215,6 +8280,20 @@ if (ui.leaderboardType) {
 
 if (ui.closeLeaderboard) {
   ui.closeLeaderboard.addEventListener("click", closeLeaderboardModal);
+}
+
+if (ui.clearLeaderboard) {
+  ui.clearLeaderboard.addEventListener("click", () => {
+    const confirmed = window.confirm("Clear all leaderboard entries? This cannot be undone.");
+    if (!confirmed) return;
+    if (typeof clearLeaderboardDocuments === "function") {
+      void clearLeaderboardDocuments();
+      return;
+    }
+    localStorage.removeItem("tdm_saved_scores");
+    leaderboardState.rows = [];
+    renderLeaderboard([]);
+  });
 }
 
 if (ui.leaderboardModal) {

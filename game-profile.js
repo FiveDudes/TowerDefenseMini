@@ -388,6 +388,65 @@
     return loadLeaderboardDocuments();
   }
 
+  async function clearLeaderboardDocuments() {
+    const ui = getUi();
+    const leaderboardState = getLeaderboardState();
+    const dbId = globalScope.localStorage.getItem("tdm_appwrite_realtime_database") || "";
+    const collectionId = globalScope.localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+    const hasRemoteLeaderboard = Boolean(globalScope.appwriteClient && globalScope.appwriteApi?.Databases && dbId && collectionId);
+    if (!hasRemoteLeaderboard) {
+      globalScope.localStorage.removeItem("tdm_saved_scores");
+      leaderboardState.rows = [];
+      renderLeaderboard([]);
+      if (ui.leaderboardStatus) {
+        ui.leaderboardStatus.textContent = "Local leaderboard cleared.";
+      }
+      return;
+    }
+    try {
+      const databases = new globalScope.appwriteApi.Databases(globalScope.appwriteClient);
+      const queryApi = globalScope.appwriteApi.Query;
+      let removed = 0;
+      while (true) {
+        const queries = [];
+        if (queryApi?.limit) {
+          queries.push(queryApi.limit(100));
+        }
+        if (queryApi?.offset) {
+          queries.push(queryApi.offset(removed));
+        }
+        const result = await databases.listDocuments(dbId, collectionId, queries);
+        const documents = Array.isArray(result?.documents) ? result.documents : [];
+        if (documents.length === 0) {
+          break;
+        }
+        await Promise.all(
+          documents
+            .map((document) => String(document?.$id || document?.id || "").trim())
+            .filter(Boolean)
+            .map((documentId) => databases.deleteDocument(dbId, collectionId, documentId)),
+        );
+        removed += documents.length;
+        if (!queryApi?.offset || documents.length < 100) {
+          break;
+        }
+      }
+      globalScope.localStorage.removeItem("tdm_saved_scores");
+      leaderboardState.rows = [];
+      renderLeaderboard([]);
+      if (ui.leaderboardStatus) {
+        ui.leaderboardStatus.textContent = `Cleared ${removed} leaderboard entries.`;
+      }
+    } catch (error) {
+      globalScope.localStorage.removeItem("tdm_saved_scores");
+      leaderboardState.rows = [];
+      renderLeaderboard([]);
+      if (ui.leaderboardStatus) {
+        ui.leaderboardStatus.textContent = `Leaderboard clear failed: ${error?.message || error}`;
+      }
+    }
+  }
+
   function getSavedScoreboardEntries() {
     try {
       const parsed = JSON.parse(globalScope.localStorage.getItem("tdm_saved_scores") || "[]");
@@ -778,6 +837,7 @@
   globalScope.getLeaderboardMetricValue = getLeaderboardMetricValue;
   globalScope.getLeaderboardLabel = getLeaderboardLabel;
   globalScope.refreshLeaderboardDocuments = refreshLeaderboardDocuments;
+  globalScope.clearLeaderboardDocuments = clearLeaderboardDocuments;
   globalScope.renderLeaderboard = renderLeaderboard;
   globalScope.updateLeaderboardUI = updateLeaderboardUI;
   globalScope.subscribeLeaderboardRealtime = subscribeLeaderboardRealtime;
