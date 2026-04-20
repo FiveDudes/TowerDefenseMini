@@ -7575,6 +7575,133 @@ function drawEnemies() {
 }
 
 function drawProjectiles() {
+  if (state.view3D) {
+    for (const proj of state.projectiles) {
+      const view = projectVoxelPoint(proj.x, proj.y, proj.kind === "gas" ? proj.radius * 0.08 : 0);
+      if (proj.kind === "gas") {
+        const alphaScale = 0.25 + (proj.maxTtl ? Math.max(0, Math.min(1, proj.ttl / proj.maxTtl)) : 1) * 0.75;
+        const radius = Math.max(6, (proj.radius || 10) * voxelView.tileWidth * (getVoxelCamera().zoom || voxelView.defaultZoom) * 0.45);
+        const gradient = ctx.createRadialGradient(view.x, view.y, radius * 0.2, view.x, view.y, radius);
+        gradient.addColorStop(0, `rgba(186, 230, 253, ${0.38 * alphaScale})`);
+        gradient.addColorStop(1, `rgba(125, 211, 252, ${0.12 * alphaScale})`);
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(view.x, view.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * alphaScale})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        continue;
+      }
+      if (proj.kind === "bomb" || proj.kind === "rocket" || proj.kind === "missile") {
+        const vx = proj.vx || 1;
+        const vy = proj.vy || 0;
+        const angle = Math.atan2(vy, vx);
+        ctx.save();
+        ctx.translate(view.x, view.y);
+        ctx.rotate(angle);
+        if (proj.kind === "bomb") {
+          ctx.fillStyle = "#5f8f46";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#20361b";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = proj.kind === "rocket" ? "#f97316" : "#fb923c";
+          ctx.beginPath();
+          ctx.moveTo(10, 0);
+          ctx.lineTo(-6, 5);
+          ctx.lineTo(-6, -5);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
+      if (proj.kind === "line") {
+        const len = 10;
+        const vx = proj.vx || 0;
+        const vy = proj.vy || 0;
+        const dist = Math.hypot(vx, vy) || 1;
+        const nx = vx / dist;
+        const ny = vy / dist;
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(view.x - nx * len * 0.6, view.y - ny * len * 0.6);
+        ctx.lineTo(view.x + nx * len, view.y + ny * len);
+        ctx.stroke();
+        continue;
+      }
+      if (proj.kind === "spikeShot" || proj.kind === "homing") {
+        const vx = proj.vx || 1;
+        const vy = proj.vy || 0;
+        const angle = Math.atan2(vy, vx);
+        ctx.save();
+        ctx.translate(view.x, view.y);
+        ctx.rotate(angle);
+        ctx.strokeStyle = proj.sourceType === "flame" ? "rgba(251, 146, 60, 0.85)" : "rgba(248, 250, 252, 0.7)";
+        ctx.lineWidth = proj.sourceType === "flame" ? 4 : 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(6, 0);
+        ctx.stroke();
+        if (proj.kind === "spikeShot") {
+          ctx.fillStyle = "#f472b6";
+          ctx.beginPath();
+          ctx.moveTo(8, 0);
+          ctx.lineTo(-6, 3);
+          ctx.lineTo(-6, -3);
+          ctx.closePath();
+          ctx.fill();
+        } else if (proj.sourceType === "dart") {
+          ctx.fillStyle = "#f8fafc";
+          ctx.beginPath();
+          ctx.moveTo(9, 0);
+          ctx.lineTo(-7, 1.5);
+          ctx.lineTo(-7, -1.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#a855f7";
+          ctx.beginPath();
+          ctx.arc(8, 0, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (proj.sourceType === "drone") {
+          ctx.strokeStyle = "#34d399";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-6, 0);
+          ctx.lineTo(7, 0);
+          ctx.stroke();
+          ctx.fillStyle = "#86efac";
+          ctx.beginPath();
+          ctx.arc(7, 0, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (proj.sourceType === "secret") {
+          ctx.fillStyle = "#f472b6";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = proj.slow > 0 ? "#38bdf8" : "#facc15";
+          ctx.beginPath();
+          ctx.arc(0, 0, proj.sourceType === "drone" ? 5 : 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
+      ctx.fillStyle = proj.slow > 0 ? "#38bdf8" : "#facc15";
+      ctx.beginPath();
+      ctx.arc(view.x, view.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
   for (const proj of state.projectiles) {
     if (proj.kind === "gas") {
       const life = proj.maxTtl ? Math.max(0, Math.min(1, proj.ttl / proj.maxTtl)) : 1;
@@ -7749,6 +7876,23 @@ function drawProjectiles() {
 }
 
 function drawExplosions() {
+  if (state.view3D) {
+    for (const explosion of state.explosions) {
+      const view = projectVoxelPoint(explosion.x, explosion.y, 0);
+      const alpha = Math.min(1, explosion.ttl * 3);
+      ctx.strokeStyle = explosion.color || "#ffffff";
+      ctx.lineWidth = explosion.lineWidth || (explosion.shockwave ? 6 : 4);
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(view.x, view.y, explosion.radius * (1 - explosion.ttl * 0.6), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = alpha * 0.35;
+      ctx.fillStyle = explosion.color || "rgba(255, 255, 255, 0.3)";
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    return;
+  }
   for (const explosion of state.explosions) {
     const alpha = Math.min(1, explosion.ttl * 3);
     ctx.strokeStyle = explosion.color || "#ffffff";
@@ -7832,6 +7976,43 @@ function drawNukeSmokeOverlay() {
 }
 
 function drawFlames() {
+  if (state.view3D) {
+    for (const flame of state.flames) {
+      const origin = projectVoxelPoint(flame.x, flame.y, 0);
+      if (flame.full) {
+        const radius = Math.max(10, (flame.radius || flame.range) * voxelView.tileWidth * (getVoxelCamera().zoom || voxelView.defaultZoom) * 0.45);
+        const grad = ctx.createRadialGradient(origin.x, origin.y, radius * 0.1, origin.x, origin.y, radius);
+        grad.addColorStop(0, "rgba(255, 153, 85, 0.5)");
+        grad.addColorStop(0.6, "rgba(249, 115, 22, 0.25)");
+        grad.addColorStop(1, "rgba(30, 41, 59, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(origin.x, origin.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const steps = 10;
+        for (let i = 1; i <= steps; i += 1) {
+          const t = i / steps;
+          const dist = flame.range * t;
+          const jitter = (Math.random() - 0.5) * 0.12;
+          const angle = flame.angle + jitter;
+          const x = flame.x + Math.cos(angle) * dist;
+          const y = flame.y + Math.sin(angle) * dist;
+          const view = projectVoxelPoint(x, y, 0);
+          const size = 4 + (1 - t) * 5;
+          const grad = ctx.createRadialGradient(view.x, view.y, size * 0.2, view.x, view.y, size);
+          grad.addColorStop(0, "rgba(255, 153, 85, 0.98)");
+          grad.addColorStop(0.45, "rgba(249, 115, 22, 0.7)");
+          grad.addColorStop(1, "rgba(30, 41, 59, 0)");
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(view.x, view.y, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    return;
+  }
   for (const flame of state.flames) {
     if (flame.full) {
       const radius = flame.radius || flame.range;
@@ -7867,6 +8048,22 @@ function drawFlames() {
 }
 
 function drawBeams() {
+  if (state.view3D) {
+    for (const beam of state.beams) {
+      const start = projectVoxelPoint(beam.x1, beam.y1, 0);
+      const end = projectVoxelPoint(beam.x2, beam.y2, 0);
+      ctx.strokeStyle = beam.color;
+      ctx.lineWidth = beam.width;
+      ctx.lineCap = "round";
+      ctx.globalAlpha = Math.min(1, beam.ttl * 8);
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    return;
+  }
   for (const beam of state.beams) {
     ctx.strokeStyle = beam.color;
     ctx.lineWidth = beam.width;
