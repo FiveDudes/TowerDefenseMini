@@ -770,8 +770,8 @@ function screenToWorld(screenX, screenY) {
 function updateCamera(dt) {
   if (!state.view3D) return;
   const camera = getVoxelCamera();
-  const forward = state.moveKeys.has("KeyW") || state.moveKeys.has("ArrowUp") ? 1 : 0;
-  const backward = state.moveKeys.has("KeyS") || state.moveKeys.has("ArrowDown") ? 1 : 0;
+  const forward = state.moveKeys.has("KeyS") || state.moveKeys.has("ArrowDown") ? 1 : 0;
+  const backward = state.moveKeys.has("KeyW") || state.moveKeys.has("ArrowUp") ? 1 : 0;
   const left = state.moveKeys.has("KeyA") || state.moveKeys.has("ArrowLeft") ? 1 : 0;
   const right = state.moveKeys.has("KeyD") || state.moveKeys.has("ArrowRight") ? 1 : 0;
   const forwardAxis = forward - backward;
