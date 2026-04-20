@@ -329,6 +329,16 @@ const targetingLabels = {
   strongest: "Strongest",
   weakest: "Weakest",
 };
+const movementKeyCodes = new Set([
+  "KeyW",
+  "KeyA",
+  "KeyS",
+  "KeyD",
+  "ArrowUp",
+  "ArrowLeft",
+  "ArrowDown",
+  "ArrowRight",
+]);
 
 const state = {
   lives: 100,
@@ -386,6 +396,12 @@ const state = {
   waveSpeed: 1,
   waveHasSpawnedNonSpeedy: false,
   towerLevelCap: 5,
+  camera: {
+    x: 420,
+    y: 96,
+    bob: 0,
+  },
+  moveKeys: new Set(),
   mapId: "rift",
   mapPaths: [],
   mapStartCells: [],
@@ -524,9 +540,11 @@ const gridCols = Math.floor(canvas.width / grid.size);
 const gridRows = Math.floor(canvas.height / grid.size);
 const firstPersonView = {
   horizonRatio: 0.22,
-  depthExponent: 1.65,
-  lateralExponent: 1.3,
-  swayAmplitude: 0.004,
+  depthExponent: 1.55,
+  depthRange: 720,
+  baseScale: 0.38,
+  scaleRange: 1.02,
+  swayAmplitude: 0.0035,
 };
 
 function cellKey(cx, cy) {
@@ -547,22 +565,76 @@ function worldToCell(x, y) {
 }
 
 function getFirstPersonProjection(x, y, lift = 0) {
+  const camera = state.camera || { x: canvas.width / 2, y: canvas.height * 0.18, bob: 0 };
+  const dx = x - camera.x;
+  const dy = y - camera.y;
+  const depthRaw = Math.max(0, Math.min(1, (dy + firstPersonView.depthRange * 0.12) / firstPersonView.depthRange));
+  const easedDepth = depthRaw * depthRaw * (3 - 2 * depthRaw);
   const horizonY = canvas.height * firstPersonView.horizonRatio;
   const groundHeight = canvas.height - horizonY;
-  const depth = Math.max(0, Math.min(1, y / canvas.height));
-  const easedDepth = depth * depth * (3 - 2 * depth);
-  const lateral = 0.12 + Math.pow(easedDepth, firstPersonView.lateralExponent) * 0.88;
-  const sway = Math.sin(performance.now() * 0.00035) * canvas.width * firstPersonView.swayAmplitude;
+  const scale = firstPersonView.baseScale + easedDepth * firstPersonView.scaleRange;
+  const sway = Math.sin(performance.now() * 0.00035 + camera.bob * 0.08) * canvas.width * firstPersonView.swayAmplitude;
   return {
-    x: canvas.width / 2 + (x - canvas.width / 2) * lateral + sway * (1 - easedDepth),
-    y: horizonY + groundHeight * Math.pow(depth, firstPersonView.depthExponent) - lift * (0.25 + easedDepth * 0.75),
-    scale: 0.5 + easedDepth * 0.95,
+    x: canvas.width / 2 + dx * scale + sway * (1 - easedDepth),
+    y: horizonY + groundHeight * Math.pow(easedDepth, firstPersonView.depthExponent) - lift * (0.35 + easedDepth * 0.8),
+    scale,
     depth: easedDepth,
   };
 }
 
 function projectPoint(x, y, lift = 0) {
   return getFirstPersonProjection(x, y, lift);
+}
+
+function screenToWorld(screenX, screenY) {
+  const camera = state.camera || { x: canvas.width / 2, y: canvas.height * 0.18, bob: 0 };
+  const horizonY = canvas.height * firstPersonView.horizonRatio;
+  const groundHeight = canvas.height - horizonY;
+  const depthRatio = Math.max(0, Math.min(1, (screenY - horizonY) / groundHeight));
+  let low = 0;
+  let high = 1;
+  let easedDepth = depthRatio;
+  for (let i = 0; i < 10; i += 1) {
+    const mid = (low + high) / 2;
+    const projected = Math.pow(mid, firstPersonView.depthExponent);
+    if (projected < depthRatio) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+    easedDepth = mid;
+  }
+  const scale = firstPersonView.baseScale + easedDepth * firstPersonView.scaleRange;
+  const sway = Math.sin(performance.now() * 0.00035 + camera.bob * 0.08) * canvas.width * firstPersonView.swayAmplitude;
+  return {
+    x: camera.x + (screenX - canvas.width / 2 - sway * (1 - easedDepth)) / Math.max(0.001, scale),
+    y: camera.y + Math.max(0, easedDepth * firstPersonView.depthRange - firstPersonView.depthRange * 0.12),
+  };
+}
+
+function updateCamera(dt) {
+  const camera = state.camera || (state.camera = { x: canvas.width / 2, y: canvas.height * 0.18, bob: 0 });
+  const forward = state.moveKeys.has("KeyW") || state.moveKeys.has("ArrowUp") ? 1 : 0;
+  const backward = state.moveKeys.has("KeyS") || state.moveKeys.has("ArrowDown") ? 1 : 0;
+  const left = state.moveKeys.has("KeyA") || state.moveKeys.has("ArrowLeft") ? 1 : 0;
+  const right = state.moveKeys.has("KeyD") || state.moveKeys.has("ArrowRight") ? 1 : 0;
+  let moveX = right - left;
+  let moveY = forward - backward;
+  const magnitude = Math.hypot(moveX, moveY);
+  if (magnitude > 0) {
+    moveX /= magnitude;
+    moveY /= magnitude;
+  }
+  const speed = (state.gameStarted ? 210 : 150) * (state.paused ? 0.25 : 1);
+  camera.x += moveX * speed * dt;
+  camera.y += moveY * speed * dt;
+  const minX = -grid.size;
+  const maxX = canvas.width + grid.size;
+  const minY = -grid.size;
+  const maxY = canvas.height + grid.size;
+  camera.x = Math.max(minX, Math.min(maxX, camera.x));
+  camera.y = Math.max(minY, Math.min(maxY, camera.y));
+  camera.bob = magnitude > 0 ? camera.bob + dt * (4.5 + speed / 220) : camera.bob * 0.9;
 }
 
 function isWallAdjacentToPath(x, y) {
@@ -3109,8 +3181,9 @@ function handleClick(event) {
     return;
   }
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const { x, y } = screenToWorld(screenX, screenY);
   const snapped = snapToGrid(x, y);
 
   for (const enemy of state.enemies) {
@@ -7483,6 +7556,20 @@ function draw() {
   drawPlacementPreview();
   ctx.restore();
   drawNukeSmokeOverlay();
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2 - 8, canvas.height / 2);
+  ctx.lineTo(canvas.width / 2 - 2, canvas.height / 2);
+  ctx.moveTo(canvas.width / 2 + 2, canvas.height / 2);
+  ctx.lineTo(canvas.width / 2 + 8, canvas.height / 2);
+  ctx.moveTo(canvas.width / 2, canvas.height / 2 - 8);
+  ctx.lineTo(canvas.width / 2, canvas.height / 2 - 2);
+  ctx.moveTo(canvas.width / 2, canvas.height / 2 + 2);
+  ctx.lineTo(canvas.width / 2, canvas.height / 2 + 8);
+  ctx.stroke();
+  ctx.restore();
   if (state.selectedTower && state.selectedTower.type !== "wall" && state.selectedTower.type !== "mine") {
     ctx.fillStyle = "#e2e8f0";
     ctx.fillText("Click to upgrade (50)", 18, canvas.height - 20);
@@ -7510,6 +7597,7 @@ function update(dt) {
     updateUpgradePanel();
     return;
   }
+  updateCamera(dt);
   const simDt = dt * (state.waveSpeed || 1);
   for (const tower of state.towers) {
     if (tower.spawnInTimer > 0) {
@@ -7606,7 +7694,7 @@ function update(dt) {
 }
 
 let lastTime = performance.now();
-state.mouse = { x: 0, y: 0 };
+state.mouse = { x: 0, y: 0, screenX: 0, screenY: 0 };
 state.draggingDrone = null;
 
 function loop(now) {
@@ -7623,8 +7711,13 @@ function loop(now) {
 canvas.addEventListener("click", handleClick);
 canvas.addEventListener("mousemove", (event) => {
   const rect = canvas.getBoundingClientRect();
-  state.mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  state.mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const world = screenToWorld(screenX, screenY);
+  state.mouse.x = world.x;
+  state.mouse.y = world.y;
+  state.mouse.screenX = screenX;
+  state.mouse.screenY = screenY;
   if (state.draggingDrone) {
     state.draggingDrone.x = state.mouse.x;
     state.draggingDrone.y = state.mouse.y;
@@ -8599,6 +8692,12 @@ function resetGame() {
   state.auraSnapshot = null;
   state.waveSpeed = 1;
   state.towerLevelCap = 5;
+  state.camera = {
+    x: canvas.width * 0.5,
+    y: canvas.height * 0.18,
+    bob: 0,
+  };
+  state.moveKeys.clear();
   state.waveKillsThisWave = 0;
   state.waveLeaksThisWave = 0;
   state.waveSpawnedThisWave = 0;
@@ -8756,6 +8855,10 @@ function tryUnlockInfiniteGold() {
 }
 
 window.addEventListener("keydown", (event) => {
+  if (movementKeyCodes.has(event.code)) {
+    event.preventDefault();
+    state.moveKeys.add(event.code);
+  }
   if (event.code === "Space") {
     event.preventDefault();
     if (state.waveInProgress) {
@@ -8789,9 +8892,6 @@ window.addEventListener("keydown", (event) => {
       state.controlledDrone = closest;
     }
   }
-  if (event.key === "ArrowUp") {
-    triggerSpikeTestExtend();
-  }
   const key = event.key.toLowerCase();
   if (key.length === 1 && key >= "a" && key <= "z") {
     state.keysDown.add(key);
@@ -8823,6 +8923,9 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("keyup", (event) => {
+  if (movementKeyCodes.has(event.code)) {
+    state.moveKeys.delete(event.code);
+  }
   const key = event.key.toLowerCase();
   if (key.length === 1 && key >= "a" && key <= "z") {
     state.keysDown.delete(key);
@@ -8835,6 +8938,7 @@ window.addEventListener("keyup", (event) => {
 window.addEventListener("blur", () => {
   state.keysDown.clear();
   state.numberKeysDown.clear();
+  state.moveKeys.clear();
   state.keyBuffer = "";
   state.jasperProgress = 0;
 });
@@ -8848,8 +8952,9 @@ canvas.addEventListener("dblclick", () => {
 canvas.addEventListener("mousedown", (event) => {
   if (event.button === 0 && state.placing) {
     const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+    const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+    const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+    const { x, y } = screenToWorld(screenX, screenY);
     const hasPlacedTower = state.towers.some((tower) => !tower.isMini && Math.hypot(tower.x - x, tower.y - y) < 20);
     if (hasPlacedTower) {
       return;
@@ -8861,8 +8966,9 @@ canvas.addEventListener("mousedown", (event) => {
   }
   if (!state.infiniteGold) return;
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const { x, y } = screenToWorld(screenX, screenY);
   let closest = null;
   let closestDist = 18;
   for (const tower of state.towers) {
@@ -8894,8 +9000,9 @@ canvas.addEventListener("mouseup", () => {
 canvas.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const { x, y } = screenToWorld(screenX, screenY);
   const snapped = snapToGrid(x, y);
   const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20 && !entry.isMini);
   if (towersHere.length > 0) {
@@ -8912,8 +9019,9 @@ canvas.addEventListener("auxclick", (event) => {
   if (!state.jasperEnabled) return;
   event.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const screenX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const screenY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  const { x, y } = screenToWorld(screenX, screenY);
   const snapped = snapToGrid(x, y);
   const towersHere = state.towers.filter((entry) => Math.hypot(entry.x - snapped.x, entry.y - snapped.y) < 20 && !entry.isMini);
   if (towersHere.length === 0) return;
