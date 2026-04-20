@@ -5372,9 +5372,8 @@ function updateEnemies(dt) {
       ? Math.max(enemy.pathIndex - 1, 0)
       : Math.min(enemy.pathIndex + 1, pathPoints.length - 1);
     const target = pathPoints[nextIndex];
-    const offset = enemy.pathOffset || { x: 0, y: 0 };
-    const targetX = target.x + offset.x;
-    const targetY = target.y + offset.y;
+    const targetX = target.x;
+    const targetY = target.y;
     const dx = targetX - enemy.x;
     const dy = targetY - enemy.y;
     const dist = Math.hypot(dx, dy);
