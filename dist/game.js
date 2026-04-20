@@ -614,8 +614,8 @@ function screenToWorld(screenX, screenY) {
 
 function updateCamera(dt) {
   const camera = state.camera || (state.camera = { x: canvas.width / 2, y: canvas.height * 0.18, bob: 0 });
-  const forward = state.moveKeys.has("KeyW") || state.moveKeys.has("ArrowUp") ? 1 : 0;
-  const backward = state.moveKeys.has("KeyS") || state.moveKeys.has("ArrowDown") ? 1 : 0;
+  const forward = state.moveKeys.has("KeyS") || state.moveKeys.has("ArrowDown") ? 1 : 0;
+  const backward = state.moveKeys.has("KeyW") || state.moveKeys.has("ArrowUp") ? 1 : 0;
   const left = state.moveKeys.has("KeyA") || state.moveKeys.has("ArrowLeft") ? 1 : 0;
   const right = state.moveKeys.has("KeyD") || state.moveKeys.has("ArrowRight") ? 1 : 0;
   let moveX = right - left;
