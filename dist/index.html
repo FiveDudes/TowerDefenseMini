@@ -110,6 +110,7 @@
           </button>
           <button id="open-jasper" class="btn-small btn-jasper hidden">Jasper Menu</button>
           <button id="teleport-spawn" class="btn-small" type="button">Teleport Spawn</button>
+          <button id="sidebar-toggle" class="btn-small" type="button" aria-expanded="false">Build Menu</button>
           <button id="half-cash" class="btn-small">Half Cash: Off</button>
         </div>
         <div class="hud">
@@ -127,7 +128,7 @@
             <div class="nuke-count" id="nuke-count">Nukes: 0</div>
           </div>
         </div>
-        <aside class="panel">
+        <aside class="panel" id="build-panel" aria-hidden="false">
           <h2>Build</h2>
           <div class="panel-grid">
             <div class="build-list">
@@ -478,47 +479,47 @@
       </div>
     </div>
     <div id="damage-flash"></div>
-    <script defer src="game-data/core.js"></script>
-    <script defer src="game-data/towers/tower.js"></script>
-    <script defer src="game-data/enemies/enemy.js"></script>
-    <script defer src="game-data/maps.js"></script>
-    <script defer src="game-data/towers/watch.js"></script>
-    <script defer src="game-data/towers/freeze.js"></script>
-    <script defer src="game-data/towers/drone.js"></script>
-    <script defer src="game-data/towers/bomb.js"></script>
-    <script defer src="game-data/towers/laser.js"></script>
-    <script defer src="game-data/towers/dart.js"></script>
-    <script defer src="game-data/towers/factory.js"></script>
-    <script defer src="game-data/towers/flame.js"></script>
-    <script defer src="game-data/towers/trap.js"></script>
-    <script defer src="game-data/towers/spike-tower.js"></script>
-    <script defer src="game-data/towers/mine.js"></script>
-    <script defer src="game-data/towers/floor-spike.js"></script>
-    <script defer src="game-data/towers/wall.js"></script>
-    <script defer src="game-data/towers/op.js"></script>
-    <script defer src="game-data/towers/secret.js"></script>
-    <script defer src="game-data/enemies/grunt.js"></script>
-    <script defer src="game-data/enemies/speedy.js"></script>
-    <script defer src="game-data/enemies/heavy.js"></script>
-    <script defer src="game-data/enemies/stealth.js"></script>
-    <script defer src="game-data/enemies/boss.js"></script>
-    <script defer src="game-data/enemies/labrat.js"></script>
-    <script defer src="game-data/enemies/diamond.js"></script>
-    <script defer src="game-data/enemies/flying.js"></script>
-    <script defer src="game-data/enemies/thief.js"></script>
-    <script defer src="game-data/enemies/troll.js"></script>
-    <script defer src="game-data/enemies/buffer.js"></script>
-    <script defer src="game-data/enemies/saboteur.js"></script>
-    <script defer src="game-data/enemies/chimera.js"></script>
-    <script defer src="game-data/enemies/brood-mother.js"></script>
-    <script defer src="game-data/enemies/aegis.js"></script>
-    <script defer src="game-data/enemies/swarm.js"></script>
-    <script defer src="game-data/mutations.js"></script>
+    <script type="module" src="game-data/core.js"></script>
+    <script type="module" src="game-data/towers/tower.js"></script>
+    <script type="module" src="game-data/enemies/enemy.js"></script>
+    <script type="module" src="game-data/maps.js"></script>
+    <script type="module" src="game-data/towers/watch.js"></script>
+    <script type="module" src="game-data/towers/freeze.js"></script>
+    <script type="module" src="game-data/towers/drone.js"></script>
+    <script type="module" src="game-data/towers/bomb.js"></script>
+    <script type="module" src="game-data/towers/laser.js"></script>
+    <script type="module" src="game-data/towers/dart.js"></script>
+    <script type="module" src="game-data/towers/factory.js"></script>
+    <script type="module" src="game-data/towers/flame.js"></script>
+    <script type="module" src="game-data/towers/trap.js"></script>
+    <script type="module" src="game-data/towers/spike-tower.js"></script>
+    <script type="module" src="game-data/towers/mine.js"></script>
+    <script type="module" src="game-data/towers/floor-spike.js"></script>
+    <script type="module" src="game-data/towers/wall.js"></script>
+    <script type="module" src="game-data/towers/op.js"></script>
+    <script type="module" src="game-data/towers/secret.js"></script>
+    <script type="module" src="game-data/enemies/grunt.js"></script>
+    <script type="module" src="game-data/enemies/speedy.js"></script>
+    <script type="module" src="game-data/enemies/heavy.js"></script>
+    <script type="module" src="game-data/enemies/stealth.js"></script>
+    <script type="module" src="game-data/enemies/boss.js"></script>
+    <script type="module" src="game-data/enemies/labrat.js"></script>
+    <script type="module" src="game-data/enemies/diamond.js"></script>
+    <script type="module" src="game-data/enemies/flying.js"></script>
+    <script type="module" src="game-data/enemies/thief.js"></script>
+    <script type="module" src="game-data/enemies/troll.js"></script>
+    <script type="module" src="game-data/enemies/buffer.js"></script>
+    <script type="module" src="game-data/enemies/saboteur.js"></script>
+    <script type="module" src="game-data/enemies/chimera.js"></script>
+    <script type="module" src="game-data/enemies/brood-mother.js"></script>
+    <script type="module" src="game-data/enemies/aegis.js"></script>
+    <script type="module" src="game-data/enemies/swarm.js"></script>
+    <script type="module" src="game-data/mutations.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
-    <script defer src="game-profile.js"></script>
-    <script defer src="game-enemies.js"></script>
-    <script defer src="game-effects.js"></script>
-    <script defer src="game-audio.js"></script>
-    <script defer src="game.js"></script>
+    <script type="module" src="game-profile.js"></script>
+    <script type="module" src="game-enemies.js"></script>
+    <script type="module" src="game-effects.js"></script>
+    <script type="module" src="game-audio.js"></script>
+    <script type="module" src="game.js"></script>
   </body>
 </html>

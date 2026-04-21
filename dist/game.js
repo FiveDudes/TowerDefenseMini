@@ -1,3 +1,21 @@
+import {
+  clampFinite,
+  readStorageJson,
+  readStorageNumber,
+  readStorageString,
+  sanitizeAppwriteEndpoint,
+  sanitizeAppwriteId,
+} from "./modules/validation.js";
+import {
+  acquireProjectile,
+  releaseProjectile,
+} from "./modules/pool.js";
+import {
+  buildSpatialHash,
+  createSpatialHash,
+  querySpatialHash,
+} from "./modules/spatial-hash.js";
+
 let booted = false;
 const boot = () => {
   if (booted) return;
@@ -62,12 +80,12 @@ window.appwriteAccount = appwriteAccount;
 window.appwriteRealtimeClient = appwriteRealtimeClient;
 const APPWRITE_ENDPOINT_KEY = "tdm_appwrite_endpoint";
 const APPWRITE_PROJECT_KEY = "tdm_appwrite_project";
-const APPWRITE_PROJECT_ID = "69db9f4c0018c3070ee8";
+const APPWRITE_PROJECT_ID = sanitizeAppwriteId("69db9f4c0018c3070ee8", "69db9f4c0018c3070ee8");
 const APPWRITE_ENDPOINT = "https://nyc.cloud.appwrite.io/v1";
 const APPWRITE_REDIRECT_URL = "https://towerdefensemini.appwrite.network/";
 const APPWRITE_REALTIME_ENDPOINT = "https://appwrite.io/v1";
-const APPWRITE_REALTIME_DATABASE_ID = localStorage.getItem("tdm_appwrite_realtime_database") || "";
-const APPWRITE_REALTIME_COLLECTION_ID = localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+const APPWRITE_REALTIME_DATABASE_ID = sanitizeAppwriteId(readStorageString(localStorage, "tdm_appwrite_realtime_database"), "");
+const APPWRITE_REALTIME_COLLECTION_ID = sanitizeAppwriteId(readStorageString(localStorage, "tdm_appwrite_realtime_collection"), "");
 const VIEW_3D_KEY = "tdm_view_3d";
 const PROFILE_NAME_KEY = "tdm_profile_name";
 const PROFILE_AVATAR_KEY = "tdm_profile_avatar";
@@ -79,31 +97,27 @@ const PROFILE_LEAST_FAVORITE_ENEMY_KEY = "tdm_profile_least_favorite_enemy";
 const PROFILE_ACTIVE_TITLE_KEY = "tdm_profile_active_title";
 const PROFILE_UNLOCKED_TITLES_KEY = "tdm_profile_unlocked_titles";
 function loadUnlockedTitles() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PROFILE_UNLOCKED_TITLES_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-  } catch {
-    return [];
-  }
+  const parsed = readStorageJson(localStorage, PROFILE_UNLOCKED_TITLES_KEY, []);
+  return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string" && value.length > 0) : [];
 }
 const loginState = {
   email: "",
   loggedIn: false,
   loading: false,
-  endpoint: localStorage.getItem(APPWRITE_ENDPOINT_KEY) || APPWRITE_ENDPOINT,
+  endpoint: sanitizeAppwriteEndpoint(readStorageString(localStorage, APPWRITE_ENDPOINT_KEY, APPWRITE_ENDPOINT), APPWRITE_ENDPOINT),
   project: APPWRITE_PROJECT_ID,
 };
 
 const profileState = {
-  name: localStorage.getItem(PROFILE_NAME_KEY) || "",
-  avatar: localStorage.getItem(PROFILE_AVATAR_KEY) || "",
+  name: readStorageString(localStorage, PROFILE_NAME_KEY, ""),
+  avatar: readStorageString(localStorage, PROFILE_AVATAR_KEY, ""),
   defaultAvatar: "",
-  maxWave: Number(localStorage.getItem(PROFILE_MAX_WAVE_KEY) || 0),
-  maxDamage: Number(localStorage.getItem(PROFILE_MAX_DAMAGE_KEY) || 0),
-  mostTowers: Number(localStorage.getItem(PROFILE_MOST_TOWERS_KEY) || 0),
-  favoriteTower: localStorage.getItem(PROFILE_FAVORITE_TOWER_KEY) || "",
-  leastFavoriteEnemy: localStorage.getItem(PROFILE_LEAST_FAVORITE_ENEMY_KEY) || "",
-  activeTitle: localStorage.getItem(PROFILE_ACTIVE_TITLE_KEY) || "",
+  maxWave: readStorageNumber(localStorage, PROFILE_MAX_WAVE_KEY, 0, 0),
+  maxDamage: readStorageNumber(localStorage, PROFILE_MAX_DAMAGE_KEY, 0, 0),
+  mostTowers: readStorageNumber(localStorage, PROFILE_MOST_TOWERS_KEY, 0, 0),
+  favoriteTower: readStorageString(localStorage, PROFILE_FAVORITE_TOWER_KEY, ""),
+  leastFavoriteEnemy: readStorageString(localStorage, PROFILE_LEAST_FAVORITE_ENEMY_KEY, ""),
+  activeTitle: readStorageString(localStorage, PROFILE_ACTIVE_TITLE_KEY, ""),
   unlockedTitles: loadUnlockedTitles(),
 };
 
@@ -194,6 +208,8 @@ const ui = {
   jasperModal: document.getElementById("jasper-modal"),
   openJasper: document.getElementById("open-jasper"),
   teleportSpawn: document.getElementById("teleport-spawn"),
+  sidebarToggle: document.getElementById("sidebar-toggle"),
+  buildPanel: document.getElementById("build-panel"),
   closeJasper: document.getElementById("close-jasper"),
   damageFlash: document.getElementById("damage-flash"),
   playArea: document.getElementById("play-area"),
@@ -420,6 +436,7 @@ const state = {
     shadow: "rgba(0, 0, 0, 0.3)",
   },
   preferredPathCells: new Set(),
+  enemyHash: createSpatialHash(72),
   difficultyMultipliers: {
     enemyHp: 1,
     enemySpeed: 1,
@@ -1083,6 +1100,9 @@ function updateHud() {
   }
   if (ui.teleportSpawn) {
     ui.teleportSpawn.disabled = !state.view3D;
+  }
+  if (ui.sidebarToggle) {
+    ui.sidebarToggle.setAttribute("aria-expanded", document.body.classList.contains("sidebar-open") ? "true" : "false");
   }
   if (ui.jasperInfiniteFunds) {
     ui.jasperInfiniteFunds.textContent = `Infinite Funds: ${state.infiniteGold ? "On" : "Off"}`;
@@ -1854,10 +1874,11 @@ function placeTower(type, x, y) {
     if (!recomputeGlobalPath(cell)) return false;
     for (const tower of state.towers) {
       if (tower.type !== "spikeTower") continue;
-      if (!isAdjacentToPath(tower.x, tower.y)) {
+        if (!isAdjacentToPath(tower.x, tower.y)) {
         state.pathPoints = prevPaths;
         updateEnemyPaths();
         cleanupOffPathFloorSpikes();
+        releaseProjectile(proj);
         return false;
       }
     }
@@ -3415,7 +3436,7 @@ function emitFreezeGas(tower, enemy, stats) {
   const startRadius = Math.min(stats.freezeRadius || data.gasRadius || 10, maxRadius);
   if (!proj) {
     playSound("freezeAura");
-    proj = {
+    proj = acquireProjectile({
       kind: "gas",
       owner: tower,
       x: origin.x,
@@ -3436,7 +3457,7 @@ function emitFreezeGas(tower, enemy, stats) {
       exposureDuration: stats.freezeExposureDuration || 0,
       knockbackChance: stats.freezeKnockbackChance || 0,
       sourceType: tower.type,
-    };
+    });
     state.projectiles.push(proj);
   } else {
     proj.facing = angle;
@@ -3522,7 +3543,7 @@ function fireProjectile(tower, enemy, stats) {
       return;
     }
     const fireHoming = (x, y, dmg, speed) => {
-      state.projectiles.push({
+      state.projectiles.push(acquireProjectile({
         kind: "homing",
         x,
         y,
@@ -3536,7 +3557,7 @@ function fireProjectile(tower, enemy, stats) {
         poisonDps: 0,
         poisonDuration: 0,
         embrittlementPercent: 0,
-      });
+      }));
     };
     const toTarget = Math.atan2(enemy.y - muzzle.y, enemy.x - muzzle.x);
     const offsetAngle = toTarget + Math.PI / 2;
@@ -3552,7 +3573,7 @@ function fireProjectile(tower, enemy, stats) {
       const missileDamage = stats.droneMissileDamage || damage * 1.1;
       const missileSplash = stats.droneMissileSplash || 30;
       for (let i = 0; i < stats.droneMissiles; i += 1) {
-        state.projectiles.push({
+        state.projectiles.push(acquireProjectile({
           kind: "rocket",
           x: muzzle.x,
           y: muzzle.y,
@@ -3567,7 +3588,7 @@ function fireProjectile(tower, enemy, stats) {
           owner: tower,
           armorPierce: true,
           screenAngle: getSpawnScreenAngle(muzzle.x, muzzle.y, targetPos.x, targetPos.y),
-        });
+        }));
       }
     }
     return;
@@ -3577,7 +3598,7 @@ function fireProjectile(tower, enemy, stats) {
     const burst = Math.max(1, stats.bombBurstCount || 1);
     const splash = stats.splashRadius || data.splashRadius || 0;
     for (let i = 0; i < burst; i += 1) {
-      state.projectiles.push({
+      state.projectiles.push(acquireProjectile({
         kind: stats.bombProjectileKind || "bomb",
         x: muzzle.x,
         y: muzzle.y,
@@ -3600,7 +3621,7 @@ function fireProjectile(tower, enemy, stats) {
         clusterChildRadius: stats.bombClusterChildRadius || 0,
         age: 0,
         spinSpeed: 12 + Math.random() * 8,
-      });
+      }));
     }
     return;
   }
@@ -3617,7 +3638,7 @@ function fireProjectile(tower, enemy, stats) {
       const dx = enemy.x - muzzle.x;
       const dy = enemy.y - muzzle.y;
       const dist = Math.hypot(dx, dy) || 1;
-      state.projectiles.push({
+      state.projectiles.push(acquireProjectile({
         kind: "line",
         x: muzzle.x,
         y: muzzle.y,
@@ -3625,10 +3646,10 @@ function fireProjectile(tower, enemy, stats) {
         vy: (dy / dist) * 120,
         ttl: 0.08,
         screenAngle: getSpawnScreenAngle(muzzle.x, muzzle.y, enemy.x, enemy.y),
-      });
+      }));
       continue;
     }
-    state.projectiles.push({
+    state.projectiles.push(acquireProjectile({
       kind: sourceType === "watch" ? "line" : "homing",
       x: muzzle.x,
       y: muzzle.y,
@@ -3650,7 +3671,7 @@ function fireProjectile(tower, enemy, stats) {
       supportPoisonDps: supportEffects.poisonDps,
       supportPoisonDuration: supportEffects.poisonDuration,
       supportPoisonTransferRadius: supportEffects.poisonTransferRadius,
-    });
+    }));
   }
 }
 
@@ -3884,15 +3905,21 @@ function fireFlameCone(tower, enemy, stats) {
 
 function updateProjectiles(dt) {
   if (state.nukeSmoke) {
+    for (const projectile of state.projectiles) {
+      releaseProjectile(projectile);
+    }
     state.projectiles = [];
     return;
   }
+  const enemyHash = state.enemyHash;
   state.projectiles = state.projectiles.filter((proj) => {
     if (proj.kind === "line") {
       proj.ttl = (proj.ttl || 0) - dt;
       proj.x += (proj.vx || 0) * dt;
       proj.y += (proj.vy || 0) * dt;
-      return proj.ttl > 0;
+      if (proj.ttl > 0) return true;
+      releaseProjectile(proj);
+      return false;
     }
     if (proj.kind === "gas") {
       proj.ttl -= dt;
@@ -3902,7 +3929,8 @@ function updateProjectiles(dt) {
       }
       const maxRadius = proj.maxRadius || proj.radius;
       proj.radius = Math.min(maxRadius, proj.radius + (proj.growRate || 0) * dt);
-      for (const enemy of state.enemies) {
+      const nearbyEnemies = querySpatialHash(enemyHash, proj.x, proj.y, proj.radius || 0);
+      for (const enemy of nearbyEnemies) {
         if (enemy.hp <= 0) continue;
         if (enemy.darkMatter) continue;
         const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
@@ -3964,12 +3992,18 @@ function updateProjectiles(dt) {
     if (proj.kind === "bomb" || proj.kind === "missile" || proj.kind === "rocket") {
       if (typeof proj.ttl === "number") {
         proj.ttl -= dt;
-        if (proj.ttl <= 0) return false;
+        if (proj.ttl <= 0) {
+          releaseProjectile(proj);
+          return false;
+        }
       }
       proj.age = (proj.age || 0) + dt;
       const isMissile = proj.kind === "missile" || proj.kind === "rocket";
       const targetPos = proj.target && proj.target.hp > 0 ? getEnemyPosition(proj.target) : proj.targetPos;
-      if (!targetPos) return false;
+      if (!targetPos) {
+        releaseProjectile(proj);
+        return false;
+      }
       if (proj.target && proj.target.hp > 0) {
         proj.targetPos = targetPos;
       }
@@ -3995,7 +4029,8 @@ function updateProjectiles(dt) {
           pushShockwave(targetPos.x, targetPos.y, proj.splashRadius, "rgba(248, 113, 113, 0.5)");
         }
         playAttackImpactSound(proj.sourceType === "bomb" || proj.kind === "rocket" ? "bombExplosion" : "explosion");
-        for (const enemy of state.enemies) {
+        const nearbyEnemies = querySpatialHash(enemyHash, targetPos.x, targetPos.y, proj.splashRadius || 0);
+        for (const enemy of nearbyEnemies) {
           if (enemy.hp <= 0) continue;
           if (enemy.armored && proj.sourceType !== "bomb" && !proj.armorPierce) continue;
           const splashDist = Math.hypot(enemy.x - targetPos.x, enemy.y - targetPos.y);
@@ -4017,7 +4052,7 @@ function updateProjectiles(dt) {
               const angle = (i / count) * Math.PI * 2;
               const ex = cx + Math.cos(angle) * spread;
               const ey = cy + Math.sin(angle) * spread;
-              state.projectiles.push({
+              state.projectiles.push(acquireProjectile({
                 kind: "bomb",
                 x: cx,
                 y: cy,
@@ -4035,7 +4070,7 @@ function updateProjectiles(dt) {
                 clusterChildRadius: 0,
                 age: 0,
                 spinSpeed: 12 + Math.random() * 8,
-              });
+              }));
             }
           };
           const clusterDamage = proj.clusterDamage || proj.damage * 0.5;
@@ -4054,8 +4089,14 @@ function updateProjectiles(dt) {
 
     if (proj.kind === "spikeShot") {
       proj.ttl = (proj.ttl || 0) - dt;
-      if (proj.ttl <= 0) return false;
-      if (!proj.target || proj.target.hp <= 0) return false;
+      if (proj.ttl <= 0) {
+        releaseProjectile(proj);
+        return false;
+      }
+      if (!proj.target || proj.target.hp <= 0) {
+        releaseProjectile(proj);
+        return false;
+      }
       const targetPos = getEnemyPosition(proj.target);
       const dx = targetPos.x - proj.x;
       const dy = targetPos.y - proj.y;
@@ -4073,6 +4114,7 @@ function updateProjectiles(dt) {
           proj.sourceType === "drone" ? 9 : 7,
           0.1,
         );
+        releaseProjectile(proj);
         return false;
       }
       proj.x += (dx / dist) * step;
@@ -4080,7 +4122,10 @@ function updateProjectiles(dt) {
       return true;
     }
 
-    if (!proj.target || proj.target.hp <= 0) return false;
+    if (!proj.target || proj.target.hp <= 0) {
+      releaseProjectile(proj);
+      return false;
+    }
     const targetPos = getEnemyPosition(proj.target);
     const dx = targetPos.x - proj.x;
     const dy = targetPos.y - proj.y;
@@ -4115,7 +4160,8 @@ function updateProjectiles(dt) {
             proj.target.armorBreakThreshold = Math.max(1, (proj.target.armorBreakThreshold || 2) - 1);
           }
           if (proj.poisonRadius > 0) {
-            for (const splash of state.enemies) {
+            const nearbyEnemies = querySpatialHash(enemyHash, proj.target.x, proj.target.y, proj.poisonRadius);
+            for (const splash of nearbyEnemies) {
               if (splash.hp <= 0) continue;
               if (splash.darkMatter) continue;
               const dist = Math.hypot(splash.x - proj.target.x, splash.y - proj.target.y);
@@ -4130,7 +4176,8 @@ function updateProjectiles(dt) {
           }
           if (proj.poisonTransfer) {
             const radius = proj.supportPoisonTransferRadius || 70;
-            for (const splash of state.enemies) {
+            const nearbyEnemies = querySpatialHash(enemyHash, proj.target.x, proj.target.y, radius);
+            for (const splash of nearbyEnemies) {
               if (splash === proj.target) continue;
               if (splash.hp <= 0) continue;
               if (splash.darkMatter) continue;
@@ -4271,7 +4318,7 @@ function updateTraps(dt) {
             ? getSupportEffectsForSource({ x: trap.x, y: trap.y, owner: trap.owner, kind: "sentry" }, { sourceType: "sentry" })
             : null;
           for (let shot = 0; shot < (trap.dual ? 2 : 1); shot += 1) {
-            state.projectiles.push({
+            state.projectiles.push(acquireProjectile({
               kind: "homing",
               x: trap.x,
               y: trap.y,
@@ -4291,7 +4338,7 @@ function updateTraps(dt) {
               supportPoisonDps: sentrySupport ? sentrySupport.poisonDps : 0,
               supportPoisonDuration: sentrySupport ? sentrySupport.poisonDuration : 0,
               supportPoisonTransferRadius: sentrySupport ? sentrySupport.poisonTransferRadius : 0,
-            });
+            }));
           }
           trap.cooldown = trap.turretRate;
         }
@@ -5331,7 +5378,7 @@ function updateFloorSpikes(dt) {
         if (shooter && !spike.spikeShot) {
           const supportEffects = getSupportEffectsForSource(spike, { sourceType: "floorSpike" });
           for (let i = 0; i < shotCount; i += 1) {
-            state.projectiles.push({
+            state.projectiles.push(acquireProjectile({
               kind: "spikeShot",
               x: spike.x,
               y: spike.y,
@@ -5348,7 +5395,7 @@ function updateFloorSpikes(dt) {
               supportPoisonDuration: supportEffects.poisonDuration,
               poisonTransfer: supportEffects.poisonTransfer,
               supportPoisonTransferRadius: supportEffects.poisonTransferRadius,
-            });
+            }));
           }
           spike.spikeShot = true;
         }
@@ -5613,7 +5660,8 @@ function updateMines() {
       continue;
     }
     let triggered = false;
-    for (const enemy of state.enemies) {
+    const nearbyEnemies = querySpatialHash(state.enemyHash, tower.x, tower.y, data.triggerRadius);
+    for (const enemy of nearbyEnemies) {
       if (enemy.hp <= 0) continue;
       if (enemy.flying) continue;
       if (enemy.stealth && !enemy.revealed) continue;
@@ -5627,7 +5675,8 @@ function updateMines() {
           color: "rgba(163, 230, 53, 0.6)",
         });
         playAttackImpactSound("explosion");
-        for (const target of state.enemies) {
+        const splashTargets = querySpatialHash(state.enemyHash, tower.x, tower.y, data.splashRadius);
+        for (const target of splashTargets) {
           if (target.hp <= 0) continue;
           if (target.flying) continue;
           const splashDist = Math.hypot(target.x - tower.x, target.y - tower.y);
@@ -6182,6 +6231,9 @@ function updateNukeLaunches(dt) {
       launch.detonated = true;
       const impactX = launch.end.x;
       const impactY = launch.end.y;
+      for (const projectile of state.projectiles) {
+        releaseProjectile(projectile);
+      }
       state.projectiles = [];
       state.beams = [];
       for (const enemy of state.enemies) {
@@ -8284,6 +8336,7 @@ function drawFlames() {
       }
     }
   }
+  state.enemyHash = buildSpatialHash(state.enemyHash || createSpatialHash(72), state.enemies, (enemy) => enemy.x, (enemy) => enemy.y);
 }
 
 function drawBeams() {
@@ -9095,6 +9148,12 @@ if (ui.teleportSpawn) {
   });
 }
 
+if (ui.sidebarToggle) {
+  ui.sidebarToggle.addEventListener("click", () => {
+    setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+  });
+}
+
 if (ui.openEncyclopedia) {
   ui.openEncyclopedia.addEventListener("click", () => {
     if (!ui.encyclopediaModal) return;
@@ -9561,6 +9620,9 @@ function resetGame() {
   state.towers = [];
   state.enemies = [];
   state.enemyDamageByType = {};
+  for (const projectile of state.projectiles) {
+    releaseProjectile(projectile);
+  }
   state.projectiles = [];
   state.beams = [];
   state.explosions = [];
@@ -9775,6 +9837,33 @@ function isBlockingOverlayOpen() {
   return overlays.some((overlay) => overlay && !overlay.classList.contains("hidden"));
 }
 
+function getCanvasPointFromTouch(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    offsetX: touch.clientX - rect.left,
+    offsetY: touch.clientY - rect.top,
+  };
+}
+
+function dispatchCanvasMouseEvent(type, touch, options = {}) {
+  const point = getCanvasPointFromTouch(touch);
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: point.clientX,
+    clientY: point.clientY,
+    button: options.button ?? 0,
+    buttons: options.buttons ?? 1,
+    ctrlKey: options.ctrlKey ?? false,
+    shiftKey: options.shiftKey ?? false,
+    altKey: options.altKey ?? false,
+    metaKey: options.metaKey ?? false,
+  });
+  canvas.dispatchEvent(event);
+}
+
 function teleportCameraToSpawn() {
   const camera = getVoxelCamera();
   const spawn = getSpawnPoint();
@@ -9785,6 +9874,16 @@ function teleportCameraToSpawn() {
   camera.vx = 0;
   camera.vy = 0;
   camera.orbiting = false;
+}
+
+function setSidebarOpen(open) {
+  document.body.classList.toggle("sidebar-open", Boolean(open));
+  if (ui.buildPanel) {
+    ui.buildPanel.setAttribute("aria-hidden", open ? "false" : "true");
+  }
+  if (ui.sidebarToggle) {
+    ui.sidebarToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
 }
 
 window.addEventListener("keydown", (event) => {
@@ -9929,6 +10028,28 @@ canvas.addEventListener("mousedown", (event) => {
     state.draggingDrone = closest;
   }
 });
+
+canvas.addEventListener("touchstart", (event) => {
+  if (!event.touches || event.touches.length === 0) return;
+  event.preventDefault();
+  dispatchCanvasMouseEvent("mousedown", event.touches[0], { button: 0, buttons: 1 });
+}, { passive: false });
+
+canvas.addEventListener("touchmove", (event) => {
+  if (!event.touches || event.touches.length === 0) return;
+  event.preventDefault();
+  dispatchCanvasMouseEvent("mousemove", event.touches[0], { button: 0, buttons: 1 });
+}, { passive: false });
+
+canvas.addEventListener("touchend", (event) => {
+  event.preventDefault();
+  dispatchCanvasMouseEvent("mouseup", event.changedTouches[0] || event.touches[0] || { clientX: 0, clientY: 0 }, { button: 0, buttons: 0 });
+}, { passive: false });
+
+canvas.addEventListener("touchcancel", (event) => {
+  event.preventDefault();
+  dispatchCanvasMouseEvent("mouseup", event.changedTouches[0] || event.touches[0] || { clientX: 0, clientY: 0 }, { button: 0, buttons: 0 });
+}, { passive: false });
 
 canvas.addEventListener("mouseup", () => {
   const camera = state.view3D ? getVoxelCamera() : null;

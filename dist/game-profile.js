@@ -15,6 +15,43 @@
     return globalScope.loginState || {};
   }
 
+  function readStorageStringSafe(key, fallback = "") {
+    if (typeof globalScope.readStorageString === "function") {
+      return globalScope.readStorageString(globalScope.localStorage, key, fallback);
+    }
+    const value = globalScope.localStorage.getItem(key);
+    return typeof value === "string" && value.length > 0 ? value : fallback;
+  }
+
+  function readStorageNumberSafe(key, fallback = 0, min = -Infinity, max = Infinity) {
+    if (typeof globalScope.readStorageNumber === "function") {
+      return globalScope.readStorageNumber(globalScope.localStorage, key, fallback, min, max);
+    }
+    const numeric = Number(readStorageStringSafe(key, String(fallback)));
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.max(min, Math.min(max, numeric));
+  }
+
+  function readStorageJsonSafe(key, fallback) {
+    if (typeof globalScope.readStorageJson === "function") {
+      return globalScope.readStorageJson(globalScope.localStorage, key, fallback);
+    }
+    try {
+      const raw = globalScope.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function sanitizeAppwriteIdSafe(value, fallback = "") {
+    if (typeof globalScope.sanitizeAppwriteId === "function") {
+      return globalScope.sanitizeAppwriteId(value, fallback);
+    }
+    const next = String(value || "").trim();
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/.test(next) ? next : fallback;
+  }
+
   function getLeaderboardState() {
     return globalScope.leaderboardState || {};
   }
@@ -260,8 +297,8 @@
       renderLeaderboard(leaderboardState.rows);
       return [];
     }
-    const dbId = globalScope.localStorage.getItem("tdm_appwrite_realtime_database") || "";
-    const collectionId = globalScope.localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+    const dbId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_database"), "");
+    const collectionId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_collection"), "");
     if (!dbId || !collectionId) {
       if (ui.leaderboardStatus) {
         ui.leaderboardStatus.textContent = "Set leaderboard database and collection ids to enable Realtime.";
@@ -347,8 +384,8 @@
       await loadLeaderboardDocuments();
       return;
     }
-    const dbId = globalScope.localStorage.getItem("tdm_appwrite_realtime_database") || "";
-    const collectionId = globalScope.localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+    const dbId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_database"), "");
+    const collectionId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_collection"), "");
     if (!dbId || !collectionId) {
       leaderboardState.subscription = null;
       await loadLeaderboardDocuments();
@@ -391,8 +428,8 @@
   async function clearLeaderboardDocuments() {
     const ui = getUi();
     const leaderboardState = getLeaderboardState();
-    const dbId = globalScope.localStorage.getItem("tdm_appwrite_realtime_database") || "";
-    const collectionId = globalScope.localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+    const dbId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_database"), "");
+    const collectionId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_collection"), "");
     const hasRemoteLeaderboard = Boolean(globalScope.appwriteClient && globalScope.appwriteApi?.Databases && dbId && collectionId);
     if (!hasRemoteLeaderboard) {
       globalScope.localStorage.removeItem("tdm_saved_scores");
@@ -448,12 +485,8 @@
   }
 
   function getSavedScoreboardEntries() {
-    try {
-      const parsed = JSON.parse(globalScope.localStorage.getItem("tdm_saved_scores") || "[]");
-      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-    } catch {
-      return [];
-    }
+    const parsed = readStorageJsonSafe("tdm_saved_scores", []);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
   }
 
   function persistSavedScoreboardEntries(entries) {
@@ -496,8 +529,8 @@
   async function uploadGameStats(enemiesKilled, towersPlaced, currentWave) {
     const entry = buildScoreEntry(enemiesKilled, towersPlaced, currentWave);
     const leaderboardState = getLeaderboardState();
-    const dbId = globalScope.localStorage.getItem("tdm_appwrite_realtime_database") || "";
-    const collectionId = globalScope.localStorage.getItem("tdm_appwrite_realtime_collection") || "";
+    const dbId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_database"), "");
+    const collectionId = sanitizeAppwriteIdSafe(readStorageStringSafe("tdm_appwrite_realtime_collection"), "");
     const localEntries = getSavedScoreboardEntries();
     localEntries.unshift(entry);
     persistSavedScoreboardEntries(localEntries);

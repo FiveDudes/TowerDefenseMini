@@ -13,6 +13,7 @@ const filesToCopy = [
   "game-enemies.js",
   "game-effects.js",
   "game-audio.js",
+  "modules",
   "game-data",
   "assets",
 ];
