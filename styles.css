@@ -1042,6 +1042,11 @@ kbd {
   pointer-events: auto;
 }
 
+.hidden,
+[aria-hidden="true"] {
+  display: none;
+}
+
 .encyclopedia-card {
   width: min(560px, 92vw);
   border-radius: 18px;
