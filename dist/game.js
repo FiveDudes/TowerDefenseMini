@@ -1935,7 +1935,6 @@ function placeTower(type, x, y) {
         state.pathPoints = prevPaths;
         updateEnemyPaths();
         cleanupOffPathFloorSpikes();
-        releaseProjectile(proj);
         return false;
       }
     }
