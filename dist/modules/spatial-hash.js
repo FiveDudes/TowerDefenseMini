@@ -60,3 +60,10 @@ export function querySpatialHash(hash, x, y, radius = 0) {
   return results;
 }
 
+if (typeof window !== "undefined") {
+  window.createSpatialHash = createSpatialHash;
+  window.clearSpatialHash = clearSpatialHash;
+  window.insertSpatialHash = insertSpatialHash;
+  window.buildSpatialHash = buildSpatialHash;
+  window.querySpatialHash = querySpatialHash;
+}

@@ -3846,6 +3846,7 @@ function fireFlameCone(tower, enemy, stats) {
       enemy,
       stats,
       state,
+      querySpatialHash,
       getTowerMuzzlePoint,
       getEnemyPosition,
       applyDamage,
@@ -3946,8 +3947,9 @@ function fireFlameCone(tower, enemy, stats) {
     ttl: 0.12,
     full: igniteAll || igniteRadius > 0,
     radius: Math.max(igniteRadius, range),
+    seed: Math.random() * Math.PI * 2,
   });
-  const emberCount = 14;
+  const emberCount = 6;
   for (let i = 0; i < emberCount; i += 1) {
     const t = 0.2 + Math.random() * 0.6;
     const jitter = (Math.random() - 0.5) * coneAngle * 0.8;
@@ -8331,6 +8333,7 @@ function drawFlames() {
   if (state.view3D) {
     for (const flame of state.flames) {
       const origin = projectVoxelPoint(flame.x, flame.y, 0);
+      const seed = flame.seed || 0;
       if (flame.full) {
         const radius = Math.max(10, (flame.radius || flame.range) * voxelView.tileWidth * (getVoxelCamera().zoom || voxelView.defaultZoom) * 0.45);
         const grad = ctx.createRadialGradient(origin.x, origin.y, radius * 0.1, origin.x, origin.y, radius);
@@ -8346,7 +8349,7 @@ function drawFlames() {
         for (let i = 1; i <= steps; i += 1) {
           const t = i / steps;
           const dist = flame.range * t;
-          const jitter = (Math.random() - 0.5) * 0.12;
+          const jitter = Math.sin(seed + i * 12.9898) * 0.06;
           const angle = flame.angle + jitter;
           const x = flame.x + Math.cos(angle) * dist;
           const y = flame.y + Math.sin(angle) * dist;
@@ -8366,6 +8369,7 @@ function drawFlames() {
     return;
   }
   for (const flame of state.flames) {
+    const seed = flame.seed || 0;
     if (flame.full) {
       const radius = flame.radius || flame.range;
       const grad = ctx.createRadialGradient(flame.x, flame.y, radius * 0.1, flame.x, flame.y, radius);
@@ -8381,7 +8385,7 @@ function drawFlames() {
       for (let i = 1; i <= steps; i += 1) {
         const t = i / steps;
         const dist = flame.range * t;
-        const jitter = (Math.random() - 0.5) * 0.12;
+        const jitter = Math.sin(seed + i * 12.9898) * 0.06;
         const angle = flame.angle + jitter;
         const x = flame.x + Math.cos(angle) * dist;
         const y = flame.y + Math.sin(angle) * dist;

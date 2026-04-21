@@ -31,6 +31,7 @@
         applyArmorHit,
         spawnNukeEmbers,
         performance,
+        querySpatialHash,
       } = context;
       const muzzle = getTowerMuzzlePoint(tower, stats);
       const originX = muzzle.x;
@@ -72,8 +73,14 @@
         }
       }
 
+      const enemyHash = state.enemyHash || null;
+      const scanRadius = Math.max(range, igniteRadius || 0);
+      const nearbyEnemies = typeof querySpatialHash === "function"
+        ? querySpatialHash(enemyHash, originX, originY, scanRadius)
+        : state.enemies;
+
       const ignited = [];
-      for (const target of state.enemies) {
+      for (const target of nearbyEnemies) {
         if (target.hp <= 0) continue;
         if (target.stealth && !target.revealed && !state.revealStealth && !igniteAll) continue;
         const dx = target.x - originX;
@@ -99,7 +106,10 @@
           const next = [];
           for (const source of frontier) {
             if (spreadWindow > 0 && source.burnTimer < burnDuration - spreadWindow) continue;
-            for (const candidate of state.enemies) {
+            const spreadTargets = typeof querySpatialHash === "function"
+              ? querySpatialHash(enemyHash, source.x, source.y, spreadRadius)
+              : state.enemies;
+            for (const candidate of spreadTargets) {
               if (candidate.hp <= 0) continue;
               if (seen.has(candidate)) continue;
               const dist = Math.hypot(candidate.x - source.x, candidate.y - source.y);
@@ -124,6 +134,7 @@
         ttl: 0.12,
         full: igniteAll || igniteRadius > 0,
         radius: Math.max(igniteRadius, range),
+        seed: Math.random() * Math.PI * 2,
         burnDps,
         burnDuration,
         flameReveal: stats.flameReveal || false,
@@ -135,7 +146,7 @@
         flameSpreadWindow: spreadWindow,
       });
 
-      const emberCount = 14;
+      const emberCount = 6;
       for (let i = 0; i < emberCount; i += 1) {
         const t = 0.2 + Math.random() * 0.6;
         const jitter = (Math.random() - 0.5) * coneAngle * 0.8;
