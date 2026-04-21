@@ -8638,7 +8638,7 @@ function update(dt) {
   updateTraps(simDt);
   updateTowers(simDt);
   resolveDynamicOverlaps();
-  if (state.enemies.length > 0) {
+  if (false && state.enemies.length > 0) {
     for (const tower of state.towers) {
       const stats = getTowerStats(tower);
       if (!stats) continue;
