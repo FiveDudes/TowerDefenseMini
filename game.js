@@ -9607,6 +9607,10 @@ if (ui.jasperModal) {
   ui.jasperModal.classList.add("hidden");
 }
 
+if (ui.leaderboardModal) {
+  ui.leaderboardModal.classList.add("hidden");
+}
+
 function resetGame() {
   state.lives = 100;
   state.maxLives = 100;

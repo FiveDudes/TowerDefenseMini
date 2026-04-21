@@ -711,6 +711,7 @@
     const ui = getUi();
     const loginState = getLoginState();
     const profileState = getProfileState();
+    syncLeaderboardControls();
     if (ui.loginButton) ui.loginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
     if (ui.gameLoginButton) ui.gameLoginButton.textContent = loginState.loggedIn ? "Logged In" : "Sign in with Google";
     const locked = loginState.loading || loginState.loggedIn;
@@ -736,6 +737,17 @@
     }
     if (ui.gameLoginButton) {
       ui.gameLoginButton.style.display = loginState.loggedIn ? "none" : "";
+    }
+  }
+
+  function syncLeaderboardControls() {
+    const ui = getUi();
+    const loginState = getLoginState();
+    const allowedEmail = String(loginState.email || "").trim().toLowerCase();
+    const canClearLeaderboard = loginState.loggedIn && allowedEmail === "jaxheung@gmail.com";
+    if (ui.clearLeaderboard) {
+      ui.clearLeaderboard.classList.toggle("hidden", !canClearLeaderboard);
+      ui.clearLeaderboard.disabled = !canClearLeaderboard;
     }
   }
 
