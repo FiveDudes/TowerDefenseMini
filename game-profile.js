@@ -236,6 +236,20 @@
     return title ? `[${title}] ${name}` : name;
   }
 
+  function getLeaderboardTitle(entry) {
+    return String(entry?.title || entry?.activeTitle || entry?.equippedTitle || entry?.profileTitle || "").trim();
+  }
+
+  function getLeaderboardAvatarSource(entry) {
+    const direct = String(entry?.avatar || entry?.avatarUrl || entry?.photoURL || entry?.photoUrl || entry?.picture || entry?.profileAvatar || "").trim();
+    if (direct) return direct;
+    return getProfileFallbackAvatar(getLeaderboardName(entry));
+  }
+
+  function isSelfLeaderboardEntry(entry) {
+    return getLeaderboardEmail(entry) === String(getLoginState().email || "").trim().toLowerCase();
+  }
+
   function getLeaderboardEmail(entry) {
     return String(entry?.email || entry?.playerEmail || entry?.userEmail || "").trim().toLowerCase();
   }
@@ -362,23 +376,80 @@
     if (!ui.leaderboardList) return;
     ui.leaderboardList.innerHTML = "";
     const deduped = dedupeLeaderboardRows(rows, leaderboardState.metric);
-    const sorted = [...deduped].sort((a, b) => getLeaderboardMetricValue(b) - getLeaderboardMetricValue(a)).slice(0, 100);
+    const sorted = [...deduped].sort((a, b) => getLeaderboardMetricValue(b) - getLeaderboardMetricValue(a));
+    const visible = sorted.slice(0, 50);
+    const loginEmail = String(getLoginState().email || "").trim().toLowerCase();
+    const playerEntry = loginEmail ? findLeaderboardEntryForEmail(sorted, loginEmail, leaderboardState.metric) : null;
     if (sorted.length === 0) {
       const item = globalScope.document.createElement("li");
       item.textContent = "No leaderboard entries yet.";
       ui.leaderboardList.appendChild(item);
+      if (ui.leaderboardYou) {
+        ui.leaderboardYou.classList.add("hidden");
+        ui.leaderboardYou.innerHTML = "";
+      }
       return;
     }
-    for (const [index, entry] of sorted.entries()) {
+    const createRow = (entry, rank) => {
       const item = globalScope.document.createElement("li");
-      const name = formatLeaderboardDisplayName(entry);
       const value = Math.round(getLeaderboardMetricValue(entry));
       const label = getLeaderboardLabel();
-      if (index === 0) item.classList.add("leaderboard-gold");
-      if (index === 1) item.classList.add("leaderboard-silver");
-      if (index === 2) item.classList.add("leaderboard-bronze");
-      item.innerHTML = `<strong>${index + 1}. ${name}</strong><span>${label}: ${value}</span>`;
-      ui.leaderboardList.appendChild(item);
+      const avatar = globalScope.document.createElement("img");
+      avatar.className = "leaderboard-avatar";
+      avatar.alt = "";
+      avatar.src = getLeaderboardAvatarSource(entry);
+      avatar.loading = "lazy";
+      avatar.decoding = "async";
+      avatar.referrerPolicy = "no-referrer";
+      const body = globalScope.document.createElement("div");
+      body.className = "leaderboard-entry-body";
+      const nameLine = globalScope.document.createElement("div");
+      nameLine.className = "leaderboard-entry-name";
+      const rankBadge = globalScope.document.createElement("span");
+      rankBadge.className = "leaderboard-rank";
+      rankBadge.textContent = String(rank);
+      const name = globalScope.document.createElement("strong");
+      name.textContent = getLeaderboardName(entry);
+      nameLine.append(rankBadge, name);
+      const title = getLeaderboardTitle(entry);
+      if (title) {
+        const titleNode = globalScope.document.createElement("span");
+        titleNode.className = "leaderboard-entry-title";
+        titleNode.textContent = title;
+        nameLine.appendChild(titleNode);
+      }
+      body.append(nameLine);
+      const score = globalScope.document.createElement("span");
+      score.className = "leaderboard-entry-score";
+      score.textContent = `${label}: ${value}`;
+      item.classList.add("leaderboard-row");
+      if (rank === 1) item.classList.add("leaderboard-gold");
+      if (rank === 2) item.classList.add("leaderboard-silver");
+      if (rank === 3) item.classList.add("leaderboard-bronze");
+      if (isSelfLeaderboardEntry(entry)) item.classList.add("leaderboard-self");
+      item.append(avatar, body, score);
+      return item;
+    };
+    for (const [index, entry] of visible.entries()) {
+      ui.leaderboardList.appendChild(createRow(entry, index + 1));
+    }
+    if (ui.leaderboardYou) {
+      if (playerEntry) {
+        const playerId = String(playerEntry.id || playerEntry.$id || playerEntry.email || getLeaderboardName(playerEntry));
+        const visibleIds = new Set(visible.map((entry) => String(entry.id || entry.$id || entry.email || getLeaderboardName(entry))));
+        const playerRank = sorted.findIndex((entry) => String(entry.id || entry.$id || entry.email || getLeaderboardName(entry)) === playerId) + 1;
+        if (visibleIds.has(playerId)) {
+          ui.leaderboardYou.classList.add("hidden");
+          ui.leaderboardYou.innerHTML = "";
+        } else {
+          ui.leaderboardYou.classList.remove("hidden");
+          ui.leaderboardYou.innerHTML = "";
+          ui.leaderboardYou.appendChild(createRow(playerEntry, playerRank || sorted.length));
+        }
+      } else {
+        ui.leaderboardYou.classList.add("hidden");
+        ui.leaderboardYou.innerHTML = "";
+      }
     }
   }
 
@@ -523,6 +594,7 @@
     const loginState = getLoginState();
     const name = profileState.name || loginState.email || "Player";
     const email = String(loginState.email || "").trim();
+    const avatar = profileState.avatar || profileState.defaultAvatar || getProfileFallbackAvatar(name);
     const towersPlaced = Math.max(0, Number(Number.isFinite(towersPlacedOverride) ? towersPlacedOverride : (state.totalTowersPlaced || state.towers?.length || 0)));
     const enemiesKilled = Math.max(0, Number(Number.isFinite(enemiesKilledOverride) ? enemiesKilledOverride : (state.totalEnemiesKilled || state.waveKillsThisWave || 0)));
     const wavesCompleted = Math.max(0, Number(Number.isFinite(wavesCompletedOverride) ? wavesCompletedOverride : (state.wave || 0)));
@@ -534,6 +606,9 @@
       email,
       playerEmail: email,
       userEmail: email,
+      avatar,
+      avatarUrl: avatar,
+      profileAvatar: avatar,
       title: getActiveTitleName(),
       activeTitle: getActiveTitleName(),
       equippedTitle: getActiveTitleName(),

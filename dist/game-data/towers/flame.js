@@ -29,6 +29,7 @@
         getTowerMuzzlePoint,
         applyDamage,
         applyArmorHit,
+        applyBurnStatus,
         spawnNukeEmbers,
         performance,
         querySpatialHash,
@@ -57,8 +58,12 @@
         if (!target.immuneHeat) {
           applyDamage(target, damage * (depth > 0 ? Math.pow(spreadPower || 0.6, depth) : 1));
           if (!target.darkMatter) {
-            target.burnTimer = Math.max(target.burnTimer, burnDuration);
-            target.burnDps = Math.max(target.burnDps, burnDps);
+            if (typeof applyBurnStatus === "function") {
+              applyBurnStatus(target, burnDps, burnDuration, 1 + depth);
+            } else {
+              target.burnTimer = Math.max(target.burnTimer, burnDuration);
+              target.burnDps = Math.max(target.burnDps, burnDps);
+            }
           }
         }
         if (stats.flameReveal) {

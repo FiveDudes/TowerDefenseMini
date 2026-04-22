@@ -182,6 +182,7 @@ const ui = {
   leaderboardButton: document.getElementById("leaderboard-button"),
   leaderboardStatus: document.getElementById("leaderboard-status"),
   leaderboardList: document.getElementById("leaderboard-list"),
+  leaderboardYou: document.getElementById("leaderboard-you"),
   leaderboardModal: document.getElementById("leaderboard-modal"),
   leaderboardType: document.getElementById("leaderboard-type"),
   clearLeaderboard: document.getElementById("clear-leaderboard"),
@@ -384,6 +385,7 @@ const state = {
   beams: [],
   explosions: [],
   flames: [],
+  damageNumbers: [],
   traps: [],
   selectedTower: null,
   selectedTrap: null,
@@ -1487,8 +1489,7 @@ function applySupportEffectsToEnemy(enemy, source, options = {}) {
   if (!enemy || enemy.hp <= 0) return;
   const supportEffects = getSupportEffectsForSource(source, options);
   if (supportEffects.burnDps > 0 && supportEffects.burnDuration > 0 && !enemy.darkMatter && !enemy.immuneHeat) {
-    enemy.burnTimer = Math.max(enemy.burnTimer || 0, supportEffects.burnDuration);
-    enemy.burnDps = Math.max(enemy.burnDps || 0, supportEffects.burnDps);
+    applyBurnStatus(enemy, supportEffects.burnDps, supportEffects.burnDuration, 1);
   }
   if (supportEffects.poisonDps > 0 && supportEffects.poisonDuration > 0 && !enemy.darkMatter) {
     enemy.dotTimer = Math.max(enemy.dotTimer || 0, supportEffects.poisonDuration);
@@ -3637,8 +3638,7 @@ function fireProjectile(tower, enemy, stats) {
       playAttackImpactSound();
       spawnImpactFlash(targetPos.x, targetPos.y, "rgba(248, 250, 252, 0.8)", 7, 0.1);
       if (stats.fireDps > 0 && stats.fireDuration > 0 && !enemy.darkMatter && !enemy.immuneHeat) {
-        enemy.burnTimer = Math.max(enemy.burnTimer || 0, stats.fireDuration);
-        enemy.burnDps = Math.max(enemy.burnDps || 0, stats.fireDps);
+        applyBurnStatus(enemy, stats.fireDps, stats.fireDuration, 1);
       }
       if (enemy.hp <= 0) {
         handleEnemyDeath(enemy);
@@ -3805,8 +3805,7 @@ function fireLaser(tower, enemy, stats, range) {
     target.slowFactor = Math.max(target.slowFactor || 0, 0.6);
     target.dotTimer = Math.max(target.dotTimer || 0, 4);
     target.dotDps = Math.max(target.dotDps || 0, 18);
-    target.burnTimer = Math.max(target.burnTimer || 0, 3);
-    target.burnDps = Math.max(target.burnDps || 0, 24);
+    applyBurnStatus(target, 24, 3, 2);
     target.embrittleTimer = Math.max(target.embrittleTimer || 0, 4);
     target.embrittleMultiplier = Math.max(target.embrittleMultiplier || 1, 1.45);
     target.radioactive = true;
@@ -3834,8 +3833,7 @@ function fireLaser(tower, enemy, stats, range) {
         playAttackImpactSound();
       }
       if (stats.fireDps > 0 && stats.fireDuration > 0 && !target.darkMatter && !target.immuneHeat) {
-        target.burnTimer = Math.max(target.burnTimer, stats.fireDuration);
-        target.burnDps = Math.max(target.burnDps, stats.fireDps);
+        applyBurnStatus(target, stats.fireDps, stats.fireDuration, 1);
       }
       if (sourceType === "op") {
         applyOpDebuffs(target);
@@ -3897,6 +3895,7 @@ function fireFlameCone(tower, enemy, stats) {
       getEnemyPosition,
       applyDamage,
       applyArmorHit,
+      applyBurnStatus,
       spawnNukeEmbers,
       performance,
     });
@@ -3927,8 +3926,7 @@ function fireFlameCone(tower, enemy, stats) {
     if (!target.immuneHeat) {
       applyDamage(target, damage * (depth > 0 ? Math.pow(spreadPower || 0.6, depth) : 1));
       if (!target.darkMatter) {
-        target.burnTimer = Math.max(target.burnTimer, burnDuration);
-        target.burnDps = Math.max(target.burnDps, burnDps);
+        applyBurnStatus(target, burnDps, burnDuration, 1);
       }
     }
     if (stats.flameReveal) {
@@ -4299,8 +4297,7 @@ function updateProjectiles(dt) {
           }
         }
         if (proj.supportBurnDps > 0 && proj.supportBurnDuration > 0 && !proj.target.darkMatter && !proj.target.immuneHeat) {
-          proj.target.burnTimer = Math.max(proj.target.burnTimer || 0, proj.supportBurnDuration);
-          proj.target.burnDps = Math.max(proj.target.burnDps || 0, proj.supportBurnDps);
+          applyBurnStatus(proj.target, proj.supportBurnDps, proj.supportBurnDuration, 1);
         }
         if (proj.supportPoisonDps > 0 && proj.supportPoisonDuration > 0 && !proj.target.darkMatter) {
           proj.target.dotTimer = Math.max(proj.target.dotTimer || 0, proj.supportPoisonDuration);
@@ -5467,8 +5464,7 @@ function updateFloorSpikes(dt) {
         }
         enemy.floorSpikeExposure = (enemy.floorSpikeExposure || 0) + dt;
         if (enemy.floorSpikeExposure >= burnDelay && !enemy.immuneHeat) {
-          enemy.burnTimer = Math.max(enemy.burnTimer, 2);
-          enemy.burnDps = Math.max(enemy.burnDps, burnDps);
+          applyBurnStatus(enemy, burnDps, 2, 1);
         }
       }
     }
@@ -5683,6 +5679,8 @@ function updateEnemies(dt) {
       if (enemy.immuneHeat) {
         enemy.burnTimer = 0;
         enemy.burnDps = 0;
+        enemy.burnStacks = 0;
+        enemy.burnStackTimer = 0;
       } else {
         const tick = Math.min(enemy.burnTimer, dt);
         enemy.burnTimer -= dt;
@@ -5692,6 +5690,10 @@ function updateEnemies(dt) {
             handleEnemyDeath(enemy);
             continue;
           }
+        }
+        if (enemy.burnTimer <= 0) {
+          enemy.burnStacks = 0;
+          enemy.burnStackTimer = 0;
         }
       }
     }
@@ -5921,7 +5923,12 @@ function updateNukeSmoke(dt) {
 }
 
 function triggerScreenShake(power, duration) {
-  return;
+  const shakePower = Math.max(0, Number(power) || 0);
+  const shakeDuration = Math.max(0, Number(duration) || 0);
+  if (shakePower <= 0 || shakeDuration <= 0) return;
+  state.screenShakePower = Math.max(state.screenShakePower || 0, shakePower);
+  state.screenShakeDuration = Math.max(state.screenShakeDuration || 0, shakeDuration);
+  state.screenShakeTime = Math.max(state.screenShakeTime || 0, shakeDuration);
 }
 
 function getScreenShakeOffset() {
@@ -5979,12 +5986,53 @@ function applyDamage(enemy, amount) {
     }
     enemy.hitFlashTimer = Math.max(enemy.hitFlashTimer || 0, 0.11);
     enemy.hitFlashColor = scaled >= enemy.hp ? "rgba(255, 110, 110, 0.9)" : "rgba(255, 255, 255, 0.9)";
+    spawnDamageNumber(enemy.x, enemy.y, applied, scaled >= enemy.hp ? "rgba(255, 140, 140, 0.98)" : "rgba(240, 248, 255, 0.98)");
+    if (applied >= 3) {
+      triggerScreenShake(Math.min(5, 0.8 + applied / 22), Math.min(0.14, 0.05 + applied / 220));
+    }
   }
   state.totalDamage += applied;
   enemy.hp -= scaled;
   if (enemy.hp <= 0) {
     handleEnemyDeath(enemy);
   }
+}
+
+function spawnDamageNumber(x, y, amount, color = "rgba(240, 248, 255, 0.98)") {
+  const value = Math.max(0, Math.round(amount));
+  if (value <= 0) return;
+  state.damageNumbers.push({
+    x,
+    y,
+    amount: value,
+    color,
+    ttl: 0.85,
+    age: 0,
+    rise: 22 + Math.min(18, value * 0.35),
+    drift: (Math.random() - 0.5) * 10,
+    scale: 1 + Math.min(0.45, value / 120),
+  });
+}
+
+function updateDamageNumbers(dt) {
+  state.damageNumbers = state.damageNumbers.filter((number) => {
+    number.age += dt;
+    number.ttl -= dt;
+    number.y -= number.rise * dt;
+    number.x += number.drift * dt;
+    return number.ttl > 0;
+  });
+}
+
+function applyBurnStatus(target, burnDps, burnDuration, stackGain = 1) {
+  if (!target || target.darkMatter || target.immuneHeat) return;
+  const duration = Math.max(0, Number(burnDuration) || 0);
+  const dps = Math.max(0, Number(burnDps) || 0);
+  if (duration <= 0 || dps <= 0) return;
+  target.burnTimer = Math.max(target.burnTimer || 0, duration);
+  target.burnDps = Math.max(target.burnDps || 0, dps);
+  target.burnStacks = Math.min(6, (target.burnStacks || 0) + Math.max(1, stackGain || 1));
+  target.burnStackTimer = Math.max(target.burnStackTimer || 0, duration);
 }
 
 function tryDragPlaceAt(x, y) {
@@ -6054,6 +6102,8 @@ function spawnSplitEnemy(parent, tier, overrides = {}) {
     dotDps: 0,
     burnTimer: 0,
     burnDps: 0,
+    burnStacks: 0,
+    burnStackTimer: 0,
     embrittleTimer: 0,
     embrittleMultiplier: 1,
     tier,
@@ -7896,13 +7946,14 @@ function drawEnemies() {
     }
 
     if (enemy.burnTimer > 0) {
+      const burnStacks = Math.max(1, Math.min(6, Math.round(enemy.burnStacks || 1)));
       ctx.strokeStyle = "rgba(249, 115, 22, 0.6)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius + 4, 0, Math.PI * 2);
       ctx.stroke();
       const burnStrength = Math.min(1, enemy.burnTimer / 2.5);
-      const particleCount = 7 + Math.round(radius * 0.35);
+      const particleCount = 7 + Math.round(radius * 0.35) + burnStacks * 2;
       const rise = performance.now() / 90;
       for (let i = 0; i < particleCount; i += 1) {
         const phase = (i / particleCount) * Math.PI * 2;
@@ -7922,6 +7973,16 @@ function drawEnemies() {
         ctx.arc(fx, fy, size, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.save();
+      ctx.globalAlpha = 0.3 + burnStrength * 0.35;
+      ctx.strokeStyle = "rgba(253, 186, 116, 0.8)";
+      ctx.lineWidth = 1.5;
+      for (let stack = 0; stack < burnStacks; stack += 1) {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius + 7 + stack * 1.8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     if (enemy.dotTimer > 0) {
@@ -8484,6 +8545,49 @@ function drawBeams() {
   }
 }
 
+function drawDamageNumbers() {
+  if (state.damageNumbers.length === 0) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "700 18px 'Bahnschrift', 'Segoe UI Semibold', 'Segoe UI', sans-serif";
+  for (const number of state.damageNumbers) {
+    const life = Math.max(0, Math.min(1, number.ttl / 0.85));
+    const alpha = Math.min(1, life * 1.4);
+    const scale = (number.scale || 1) * (1 + (1 - life) * 0.18);
+    const offsetY = (1 - life) * 18;
+    if (state.view3D) {
+      const view = projectVoxelPoint(number.x, number.y, 18);
+      ctx.save();
+      ctx.translate(view.x, view.y - offsetY);
+      ctx.scale(scale * (view.scale || 1), scale * (view.scale || 1));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = number.color || "rgba(240, 248, 255, 0.98)";
+      ctx.shadowColor = "rgba(15, 23, 42, 0.8)";
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(2, 6, 23, 0.72)";
+      ctx.strokeText(String(number.amount), 0, 0);
+      ctx.fillText(String(number.amount), 0, 0);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(number.x, number.y - offsetY);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = number.color || "rgba(240, 248, 255, 0.98)";
+      ctx.shadowColor = "rgba(15, 23, 42, 0.8)";
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(2, 6, 23, 0.72)";
+      ctx.strokeText(String(number.amount), 0, 0);
+      ctx.fillText(String(number.amount), 0, 0);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
 function spawnVisualTrail(x1, y1, x2, y2, color, width, ttl = 0.08) {
   state.beams.push({
     x1,
@@ -8622,6 +8726,7 @@ function draw() {
   drawNukeLaunches();
   drawBeams();
   drawPlacementPreview();
+  drawDamageNumbers();
   ctx.restore();
   drawNukeSmokeOverlay();
   if (state.selectedTower && state.selectedTower.type !== "wall" && state.selectedTower.type !== "mine") {
@@ -8716,6 +8821,7 @@ function update(dt) {
     }
   }
   updateProjectiles(simDt);
+  updateDamageNumbers(simDt);
   updateExplosions(simDt);
   updateNukeLaunches(simDt);
   updateNukeParticles(simDt);
@@ -8756,6 +8862,10 @@ function loop(now) {
   lastTime = now;
   if (state.screenShakeTime > 0) {
     state.screenShakeTime = Math.max(0, state.screenShakeTime - dt);
+    if (state.screenShakeTime <= 0) {
+      state.screenShakePower = 0;
+      state.screenShakeDuration = 0;
+    }
   }
   update(dt);
   draw();
@@ -9759,6 +9869,7 @@ function resetGame() {
   state.beams = [];
   state.explosions = [];
   state.flames = [];
+  state.damageNumbers = [];
   state.portalClock = 0;
   state.traps = [];
   state.nukeLaunches = [];

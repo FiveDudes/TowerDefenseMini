@@ -105,6 +105,8 @@
       dotDps: 0,
       burnTimer: 0,
       burnDps: 0,
+      burnStacks: 0,
+      burnStackTimer: 0,
       embrittleTimer: 0,
       embrittleMultiplier: 1,
       tier,
