@@ -2727,6 +2727,8 @@ function getTowerStats(tower) {
     projectileSpeed,
     fireDps,
     fireDuration,
+    burnDps: fireDps,
+    burnDuration: fireDuration,
     coneAngle,
     flameSpreadDepth,
     flameSpreadPower,
@@ -3909,14 +3911,15 @@ function fireFlameCone(tower, enemy, stats) {
   const coneAngle = stats.coneAngle || data.coneAngle || 0.7;
   const range = stats.range;
   const damage = stats.damage;
-  const burnDps = stats.fireDps > 0 ? stats.fireDps : (data.burnDps || 18);
-  const burnDuration = stats.fireDuration > 0 ? stats.fireDuration : (data.burnDuration || 3);
+  const burnDps = stats.burnDps > 0 ? stats.burnDps : (stats.fireDps > 0 ? stats.fireDps : (data.burnDps || 18));
+  const burnDuration = stats.burnDuration > 0 ? stats.burnDuration : (stats.fireDuration > 0 ? stats.fireDuration : (data.burnDuration || 3));
   const igniteAll = stats.flameIgniteAll;
   const spreadDepth = stats.flameSpreadDepth || 0;
   const spreadPower = stats.flameSpreadPower || 0;
   const spreadWindow = stats.flameSpreadWindow || 0;
   const spreadRadius = 50;
   const igniteRadius = stats.flameRadius || 0;
+  const coneHalfAngle = Math.max(0.14, (coneAngle * 0.5) + 0.06);
   const now = performance.now() / 1000;
   spawnVisualTrail(originX, originY, targetPos.x, targetPos.y, "rgba(251, 146, 60, 0.9)", 10, 0.11);
   function igniteTarget(target, depth = 0) {
@@ -3952,9 +3955,9 @@ function fireFlameCone(tower, enemy, stats) {
     const targetAngle = Math.atan2(dy, dx);
     let diff = Math.abs(targetAngle - angle);
     if (diff > Math.PI) diff = Math.PI * 2 - diff;
-    const inCone = diff <= coneAngle * 0.5;
+    const inCone = diff <= coneHalfAngle;
     const inAura = igniteRadius > 0 && dist <= igniteRadius;
-    if ((stats.flameIgniteAll && dist <= range) || inCone || inAura) {
+    if ((stats.flameIgniteAll && dist <= range + 4) || inCone || inAura) {
       igniteTarget(target);
       ignited.push(target);
     }
@@ -4875,6 +4878,9 @@ function getEnemyProgress(enemy) {
 function selectTarget(tower, stats) {
   const range = Number.isFinite(stats.range) ? stats.range : (stats.data && Number.isFinite(stats.data.range) ? stats.data.range : 0);
   if (!Number.isFinite(range) || range <= 0) return null;
+  const origin = tower.type === "flame"
+    ? getTowerMuzzlePoint(tower, stats)
+    : { x: tower.x, y: tower.y };
   const candidates = [];
   const fallback = [];
   for (const enemy of state.enemies) {
@@ -4884,7 +4890,7 @@ function selectTarget(tower, stats) {
       if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
     }
     if (enemy.stealth && !enemy.revealed && tower.type !== "watch" && tower.type !== "op" && !state.revealStealth && !stats.canHitStealth) continue;
-    const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+    const dist = Math.hypot(enemy.x - origin.x, enemy.y - origin.y);
     if (dist <= range) {
       candidates.push({ enemy, dist });
     } else {

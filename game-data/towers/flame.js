@@ -33,6 +33,7 @@
         performance,
         querySpatialHash,
       } = context;
+      const flameData = stats.data || {};
       const muzzle = getTowerMuzzlePoint(tower, stats);
       const originX = muzzle.x;
       const originY = muzzle.y;
@@ -41,14 +42,15 @@
       const coneAngle = stats.coneAngle || 0.7;
       const range = stats.range;
       const damage = stats.damage;
-      const burnDps = stats.fireDps > 0 ? stats.fireDps : 18;
-      const burnDuration = stats.fireDuration > 0 ? stats.fireDuration : 3;
+      const burnDps = stats.burnDps > 0 ? stats.burnDps : (stats.fireDps > 0 ? stats.fireDps : (flameData.burnDps || 18));
+      const burnDuration = stats.burnDuration > 0 ? stats.burnDuration : (stats.fireDuration > 0 ? stats.fireDuration : (flameData.burnDuration || 3));
       const igniteAll = Boolean(stats.flameIgniteAll);
       const spreadDepth = stats.flameSpreadDepth || 0;
       const spreadPower = stats.flameSpreadPower || 0;
       const spreadWindow = stats.flameSpreadWindow || 0;
       const spreadRadius = 50;
       const igniteRadius = stats.flameRadius || 0;
+      const coneHalfAngle = Math.max(0.14, (coneAngle * 0.5) + 0.06);
 
       function igniteTarget(target, depth = 0) {
         if (target.hp <= 0) return;
@@ -74,7 +76,7 @@
       }
 
       const enemyHash = state.enemyHash || null;
-      const scanRadius = Math.max(range, igniteRadius || 0);
+      const scanRadius = Math.max(range, igniteRadius || 0) + 12;
       const nearbyEnemies = typeof querySpatialHash === "function"
         ? querySpatialHash(enemyHash, originX, originY, scanRadius)
         : state.enemies;
@@ -90,9 +92,9 @@
         const targetAngle = Math.atan2(dy, dx);
         let diff = Math.abs(targetAngle - angle);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
-        const inCone = diff <= coneAngle * 0.5;
+        const inCone = diff <= coneHalfAngle;
         const inAura = igniteRadius > 0 && dist <= igniteRadius;
-        if ((stats.flameIgniteAll && dist <= range) || inCone || inAura) {
+        if ((stats.flameIgniteAll && dist <= range + 4) || inCone || inAura) {
           igniteTarget(target);
           ignited.push(target);
         }
