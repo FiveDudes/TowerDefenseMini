@@ -241,8 +241,20 @@
   }
 
   function getLeaderboardAvatarSource(entry) {
-    const direct = String(entry?.avatar || entry?.avatarUrl || entry?.photoURL || entry?.photoUrl || entry?.picture || entry?.profileAvatar || "").trim();
+    const direct = String(
+      entry?.accountAvatar ||
+      entry?.avatar ||
+      entry?.avatarUrl ||
+      entry?.photoURL ||
+      entry?.photoUrl ||
+      entry?.picture ||
+      entry?.profileAvatar ||
+      ""
+    ).trim();
     if (direct) return direct;
+    const profileState = getProfileState();
+    const fallback = profileState.avatar || profileState.defaultAvatar || "";
+    if (isSelfLeaderboardEntry(entry) && fallback) return fallback;
     return getProfileFallbackAvatar(getLeaderboardName(entry));
   }
 
@@ -606,6 +618,7 @@
       email,
       playerEmail: email,
       userEmail: email,
+      accountAvatar: avatar,
       avatar,
       avatarUrl: avatar,
       profileAvatar: avatar,
